@@ -50,7 +50,7 @@ def generate_content(prompt, role):
         return None
 
     data = {
-        "model": "gpt-4-0125-preview",
+        "model": "gpt-4o-mini",
         "messages": [
             {"role": "system", "content": f"You are a helpful assistant specializing in {role}."},
             {"role": "user", "content": prompt}
