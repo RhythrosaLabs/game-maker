@@ -13,6 +13,10 @@ API_KEY_FILE = "api_key.json"
 # Initialize session state
 if 'api_key' not in st.session_state:
     st.session_state.api_key = None
+if 'images' not in st.session_state:
+    st.session_state.images = {}
+if 'unity_scripts' not in st.session_state:
+    st.session_state.unity_scripts = {}
 
 def load_api_key():
     if os.path.exists(API_KEY_FILE):
@@ -93,11 +97,31 @@ def generate_game_plan(user_prompt):
     with st.spinner('Generating dialogue...'):
         game_plan['dialogue'] = generate_content(f"Write some dialogue for the 2D game based on the plot of the game: {game_plan['game_concept']}", "dialogue writing")
 
+    # Generate and display images
     with st.spinner('Generating images...'):
-        game_plan['images'] = generate_images(game_plan)
+        st.session_state.images['character_image'] = generate_image(
+            f"Create a detailed, tall image of the main character from this game concept: {game_plan['character_concepts']}. The image should have no background and be easily converted to 3D.",
+            "1024x1792"
+        )
+        st.session_state.images['enemy_image'] = generate_image(
+            f"Create a detailed, tall image of the enemy character from this game concept: {game_plan['character_concepts']}. The image should have no background and be easily converted to 3D.",
+            "1024x1792"
+        )
+        st.session_state.images['background_image'] = generate_image(
+            f"Create a wide background image or skybox based on the world concept of this game: {game_plan['world_concept']}.",
+            "1792x1024"
+        )
+        st.session_state.images['object_image_1'] = generate_image(
+            f"Create an image of a key object from the world of this game: {game_plan['world_concept']}. The object should have no background.",
+            "1024x1024"
+        )
+        st.session_state.images['object_image_2'] = generate_image(
+            f"Create another image of a key object from the world of this game: {game_plan['world_concept']}. The object should have no background.",
+            "1024x1024"
+        )
 
     with st.spinner('Generating Unity scripts...'):
-        game_plan['unity_scripts'] = generate_unity_scripts(game_plan)
+        st.session_state.unity_scripts = generate_unity_scripts(game_plan)
 
     with st.spinner('Generating recap...'):
         game_plan['recap'] = generate_content(f"Recap the game plan for the 2D game: {game_plan['game_concept']}", "summarization")
@@ -106,31 +130,6 @@ def generate_game_plan(user_prompt):
         game_plan['master_document'] = create_master_document(game_plan)
 
     return game_plan
-
-def generate_images(game_plan):
-    images = {
-        'character_image': generate_image(
-            f"Create a detailed, tall image of the main character from this game concept: {game_plan['character_concepts']}. The image should have no background and be easily converted to 3D.",
-            "1024x1792"
-        ),
-        'enemy_image': generate_image(
-            f"Create a detailed, tall image of the enemy character from this game concept: {game_plan['character_concepts']}. The image should have no background and be easily converted to 3D.",
-            "1024x1792"
-        ),
-        'background_image': generate_image(
-            f"Create a wide background image or skybox based on the world concept of this game: {game_plan['world_concept']}.",
-            "1792x1024"
-        ),
-        'object_image_1': generate_image(
-            f"Create an image of a key object from the world of this game: {game_plan['world_concept']}. The object should have no background.",
-            "1024x1024"
-        ),
-        'object_image_2': generate_image(
-            f"Create another image of a key object from the world of this game: {game_plan['world_concept']}. The object should have no background.",
-            "1024x1024"
-        )
-    }
-    return images
 
 def generate_unity_scripts(game_plan):
     descriptions = [
@@ -206,9 +205,13 @@ if st.session_state.api_key:
                     st.subheader(key.replace('_', ' ').capitalize())
                     st.write(value)
                 elif key == "images":
-                    for image_key, image_url in value.items():
+                    for image_key, image_url in st.session_state.images.items():
                         st.subheader(image_key.replace('_', ' ').capitalize())
                         st.image(image_url)
+                elif key == "unity_scripts":
+                    st.subheader('Unity Scripts')
+                    for script_key, script_code in value.items():
+                        st.code(script_code, language='csharp')
 
             # Create download button for ZIP file
             zip_file = create_zip(game_plan)
@@ -220,3 +223,5 @@ if st.session_state.api_key:
             )
         else:
             st.warning("Please enter a prompt.")
+else:
+    st.warning("Please set your OpenAI API key to use the application.")
