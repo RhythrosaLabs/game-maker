@@ -4,7 +4,7 @@ import json
 import os
 import zipfile
 from io import BytesIO
-from PIL import Image
+from PIL import image
 
 # Constants
 CHAT_API_URL = "https://api.openai.com/v1/chat/completions"
@@ -14,6 +14,14 @@ API_KEY_FILE = "api_key.json"
 # Initialize session state
 if 'api_key' not in st.session_state:
     st.session_state.api_key = None
+
+if 'customization' not in st.session_state:
+    st.session_state.customization = {
+        'image_types': ['Character', 'Enemy', 'Background', 'Object'],
+        'script_types': ['Player', 'Enemy', 'Game Object', 'Level Background'],
+        'image_count': {'Character': 1, 'Enemy': 1, 'Background': 1, 'Object': 2},
+        'script_count': {'Player': 1, 'Enemy': 1, 'Game Object': 3, 'Level Background': 1}
+    }
 
 def load_api_key():
     if os.path.exists(API_KEY_FILE):
@@ -31,6 +39,8 @@ def get_headers():
         "Authorization": f"Bearer {st.session_state.api_key}",
         "Content-Type": "application/json"
     }
+
+
 
 def generate_content(prompt, role):
     data = {
@@ -76,6 +86,48 @@ def generate_image(prompt, size):
     except requests.RequestException as e:
         return f"Error: Unable to generate image: {str(e)}"
 
+def generate_images(customization):
+    images = {}
+    image_prompts = {
+        'Character': f"Create a detailed, tall image of the main character with no background, easily convertible to 3D.",
+        'Enemy': f"Create a detailed, tall image of the enemy character with no background, easily convertible to 3D.",
+        'Background': f"Create a wide background image or skybox.",
+        'Object': f"Create an image of a key object from the world with no background."
+    }
+    
+    sizes = {
+        'Character': '1024x1792',
+        'Enemy': '1024x1792',
+        'Background': '1792x1024',
+        'Object': '1024x1024'
+    }
+
+    for img_type in st.session_state.customization['image_types']:
+        for i in range(st.session_state.customization['image_count'].get(img_type, 1)):
+            prompt = f"{image_prompts[img_type]} - Instance {i + 1}"
+            size = sizes[img_type]
+            image_url = generate_image(prompt, size)
+            images[f"{img_type.lower()}_image_{i + 1}"] = image_url
+
+    return images
+
+def generate_unity_scripts(customization):
+    script_descriptions = {
+        'Player': "Unity script for the player character with WASD controls and space bar to jump or shoot.",
+        'Enemy': "Unity script for an enemy character with basic AI behavior.",
+        'Game Object': "Unity script for a game object with basic functionality.",
+        'Level Background': "Unity script for the level background."
+    }
+    
+    scripts = {}
+    for script_type in st.session_state.customization['script_types']:
+        for i in range(st.session_state.customization['script_count'].get(script_type, 1)):
+            desc = f"{script_descriptions[script_type]} - Instance {i + 1}"
+            script_code = generate_content(desc, "Unity scripting")
+            scripts[f"{script_type.lower()}_script_{i + 1}.cs"] = script_code
+    
+    return scripts
+
 def generate_game_plan(user_prompt):
     game_plan = {}
 
@@ -95,10 +147,10 @@ def generate_game_plan(user_prompt):
         game_plan['dialogue'] = generate_content(f"Write some dialogue for the 2D game based on the plot of the game: {game_plan['game_concept']}", "dialogue writing")
 
     with st.spinner('Generating images...'):
-        game_plan['images'] = generate_images(game_plan)
+        game_plan['images'] = generate_images(st.session_state.customization)
 
     with st.spinner('Generating Unity scripts...'):
-        game_plan['unity_scripts'] = generate_unity_scripts(game_plan)
+        game_plan['unity_scripts'] = generate_unity_scripts(st.session_state.customization)
 
     with st.spinner('Generating recap...'):
         game_plan['recap'] = generate_content(f"Recap the game plan for the 2D game: {game_plan['game_concept']}", "summarization")
@@ -108,56 +160,6 @@ def generate_game_plan(user_prompt):
 
     return game_plan
 
-def generate_images(game_plan):
-    images = {
-        'character_image': generate_image(
-            f"Create a detailed, tall image of the main character from this game concept. The image should have no background and be easily converted to 3D.",
-            "1024x1792"
-        ),
-        'enemy_image': generate_image(
-            f"Create a detailed, tall image of the enemy character from this game concept. The image should have no background and be easily converted to 3D.",
-            "1024x1792"
-        ),
-        'background_image': generate_image(
-            f"Create a wide background image or skybox based on the world concept of this game.",
-            "1792x1024"
-        ),
-        'object_image_1': generate_image(
-            f"Create an image of a key object from the world of this game. The object should have no background.",
-            "1024x1024"
-        ),
-        'object_image_2': generate_image(
-            f"Create another image of a key object from the world of this game. The object should have no background.",
-            "1024x1024"
-        )
-    }
-    
-    # Download images from URLs
-    for key, url in images.items():
-        if not url.startswith("http"):
-            images[key] = None  # Or some placeholder if URL is invalid
-        else:
-            try:
-                response = requests.get(url)
-                response.raise_for_status()
-                images[key] = response.content
-            except requests.RequestException as e:
-                st.error(f"Failed to download {key}: {e}")
-                images[key] = None
-    
-    return images
-
-def generate_unity_scripts(game_plan):
-    descriptions = [
-        f"Unity script for the player character in a 2D game with WASD controls and space bar to jump or shoot, based on the character descriptions: {game_plan['character_concepts']}",
-        f"Unity script for an enemy character in a 2D game with basic AI behavior, based on the character descriptions: {game_plan['character_concepts']}",
-        f"Unity script for a game object in a 2D game, based on the world concept: {game_plan['world_concept']}",
-        f"Unity script for a second game object in a 2D game, based on the world concept: {game_plan['world_concept']}",
-        f"Unity script for a third game object in a 2D game, based on the world concept: {game_plan['world_concept']}",
-        f"Unity script for the level background in a 2D game, based on the world concept: {game_plan['world_concept']}"
-    ]
-    scripts = {f"script_{i + 1}.cs": generate_content(desc, "Unity scripting") for i, desc in enumerate(descriptions)}
-    return scripts
 
 def create_master_document(game_plan):
     master_doc = "Game Plan Master Document\n\n"
@@ -182,11 +184,15 @@ def create_zip(content_dict):
                 zip_file.writestr(f"{key}.txt", value)
             elif isinstance(value, dict):
                 for sub_key, sub_value in value.items():
-                    if sub_key.endswith('.cs'):
-                        zip_file.writestr(f"{key}/{sub_key}", sub_value)
-                    elif isinstance(sub_value, bytes):
-                        zip_file.writestr(f"{key}/{sub_key}.png", sub_value)
-    
+                    if isinstance(sub_value, str):
+                        if "http" in sub_value:  # Assuming URL indicates an image
+                            # Download the image
+                            img_response = requests.get(sub_value)
+                            img_data = img_response.content
+                            zip_file.writestr(f"{key}/{sub_key}", img_data)
+                        else:
+                            zip_file.writestr(f"{key}/{sub_key}", sub_value)
+
     zip_buffer.seek(0)
     return zip_buffer.getvalue()
 
@@ -202,28 +208,61 @@ if not st.session_state.api_key:
     if st.button("Set API Key"):
         st.session_state.api_key = api_key
         save_api_key(api_key)
-        st.success("API key saved.")
-else:
-    st.write("API key is set.")
+        st.success("API key set successfully!")
 
-    # Main Application
+# Customization Inputs
+st.sidebar.header("Customization Options")
+
+# Image Customization
+image_types = st.sidebar.multiselect(
+    "Select image types to generate:",
+    options=['Character', 'Enemy', 'Background', 'Object'],
+    default=['Character', 'Enemy', 'Background', 'Object']
+)
+
+image_counts = {img_type: st.sidebar.slider(f"Number of {img_type} images:", min_value=1, max_value=10, value=st.session_state.customization['image_count'].get(img_type, 1)) for img_type in image_types}
+
+# Script Customization
+script_types = st.sidebar.multiselect(
+    "Select script types to generate:",
+    options=['Player', 'Enemy', 'Game Object', 'Level Background'],
+    default=['Player', 'Enemy', 'Game Object', 'Level Background']
+)
+
+script_counts = {script_type: st.sidebar.slider(f"Number of {script_type} scripts:", min_value=1, max_value=10, value=st.session_state.customization['script_count'].get(script_type, 1)) for script_type in script_types}
+
+# Save customization state
+st.session_state.customization['image_types'] = image_types
+st.session_state.customization['image_count'] = image_counts
+st.session_state.customization['script_types'] = script_types
+st.session_state.customization['script_count'] = script_counts
+
+# Main Content
+if st.session_state.api_key:
     prompt = st.text_input("Enter topic/keywords for your game:")
     if st.button("Generate Game Plan"):
         if prompt:
-            game_plan = generate_game_plan(prompt)
-
+            st.session_state.game_plan = generate_game_plan(prompt)
+            
             # Display generated content
+            game_plan = st.session_state.game_plan
             for key, value in game_plan.items():
                 if key not in ["unity_scripts", "master_document", "images"]:
                     st.subheader(key.replace('_', ' ').capitalize())
                     st.write(value)
                 elif key == "images":
-                    for image_key, image_data in value.items():
+                    for image_key, image_url in value.items():
                         st.subheader(image_key.replace('_', ' ').capitalize())
-                        if image_data:
-                            st.image(image_data)
-                        else:
-                            st.write(f"No image available for {image_key}")
+                        st.image(image_url)
+                elif key == "unity_scripts":
+                    st.subheader('Unity Scripts')
+                    for script_key, script_code in value.items():
+                        st.download_button(
+                            label=script_key,
+                            data=script_code,
+                            file_name=script_key,
+                            mime="text/plain"
+                        )
 
             # Create download button for ZIP file
             zip_file = create_zip(game_plan)
