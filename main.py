@@ -40,8 +40,6 @@ def get_headers():
         "Content-Type": "application/json"
     }
 
-
-
 def generate_content(prompt, role):
     data = {
         "model": "gpt-4o-mini",
@@ -59,8 +57,7 @@ def generate_content(prompt, role):
             error_message = response_data.get("error", {}).get("message", "Unknown error")
             return f"Error: {error_message}"
 
-        content_text = response_data["choices"][0]["message"]["content"]
-        return content_text
+        return response_data["choices"][0]["message"]["content"]
 
     except requests.RequestException as e:
         return f"Error: Unable to communicate with the OpenAI API: {str(e)}"
@@ -85,20 +82,18 @@ def generate_image(prompt, size):
         if not response_data["data"]:
             return "Error: No data returned from API."
 
-        image_url = response_data["data"][0]["url"]
-        return image_url
+        return response_data["data"][0]["url"]
 
     except requests.RequestException as e:
         return f"Error: Unable to generate image: {str(e)}"
 
-
 def generate_images(customization):
     images = {}
     image_prompts = {
-        'Character': f"Create a detailed, tall image of the main character with no background.",
-        'Enemy': f"Create a detailed, tall image of the enemy character with no background.",
-        'Background': f"Create a wide background image or skybox.",
-        'Object': f"Create an image of a key object from the world with no background."
+        'Character': "Create a detailed, tall image of the main character with no background.",
+        'Enemy': "Create a detailed, tall image of the enemy character with no background.",
+        'Background': "Create a wide background image or skybox.",
+        'Object': "Create an image of a key object from the world with no background."
     }
     
     sizes = {
@@ -166,7 +161,6 @@ def generate_game_plan(user_prompt):
 
     return game_plan
 
-
 def create_master_document(game_plan):
     master_doc = "Game Plan Master Document\n\n"
     for key, value in game_plan.items():
@@ -190,14 +184,12 @@ def create_zip(content_dict):
                 zip_file.writestr(f"{key}.txt", value)
             elif isinstance(value, dict):
                 for sub_key, sub_value in value.items():
-                    if isinstance(sub_value, str):
-                        if "http" in sub_value:  # Assuming URL indicates an image
-                            # Download the image
-                            img_response = requests.get(sub_value)
-                            img_data = img_response.content
-                            zip_file.writestr(f"{key}/{sub_key}", img_data)
-                        else:
-                            zip_file.writestr(f"{key}/{sub_key}", sub_value)
+                    if isinstance(sub_value, str) and "http" in sub_value:  # Assuming URL indicates an image
+                        img_response = requests.get(sub_value)
+                        img_data = img_response.content
+                        zip_file.writestr(f"{key}/{sub_key}", img_data)
+                    else:
+                        zip_file.writestr(f"{key}/{sub_key}", sub_value)
 
     zip_buffer.seek(0)
     return zip_buffer.getvalue()
@@ -223,7 +215,7 @@ st.sidebar.header("Customization Options")
 image_types = st.sidebar.multiselect(
     "Select image types to generate:",
     options=['Character', 'Enemy', 'Background', 'Object'],
-    default=['Character', 'Enemy', 'Background', 'Object']
+    default=st.session_state.customization['image_types']
 )
 
 image_counts = {img_type: st.sidebar.slider(f"Number of {img_type} images:", min_value=1, max_value=10, value=st.session_state.customization['image_count'].get(img_type, 1)) for img_type in image_types}
@@ -232,7 +224,7 @@ image_counts = {img_type: st.sidebar.slider(f"Number of {img_type} images:", min
 script_types = st.sidebar.multiselect(
     "Select script types to generate:",
     options=['Player', 'Enemy', 'Game Object', 'Level Background'],
-    default=['Player', 'Enemy', 'Game Object', 'Level Background']
+    default=st.session_state.customization['script_types']
 )
 
 script_counts = {script_type: st.sidebar.slider(f"Number of {script_type} scripts:", min_value=1, max_value=10, value=st.session_state.customization['script_count'].get(script_type, 1)) for script_type in script_types}
@@ -257,9 +249,9 @@ if st.session_state.api_key:
                     st.subheader(key.replace('_', ' ').capitalize())
                     st.write(value)
                 elif key == "images":
+                    st.subheader('Generated Images')
                     for image_key, image_url in value.items():
-                        st.subheader(image_key.replace('_', ' ').capitalize())
-                        st.image(image_url)
+                        st.image(image_url, caption=image_key.replace('_', ' ').capitalize())
                 elif key == "unity_scripts":
                     st.subheader('Unity Scripts')
                     for script_key, script_code in value.items():
