@@ -67,9 +67,11 @@ def generate_content(prompt, role):
 
 def generate_image(prompt, size):
     data = {
+        "model": "dall-e-3",
         "prompt": prompt,
         "size": size,
-        "n": 1
+        "n": 1,
+        "response_format": "url"
     }
 
     try:
@@ -80,11 +82,15 @@ def generate_image(prompt, size):
             error_message = response_data.get("error", {}).get("message", "Unknown error")
             return f"Error: {error_message}"
 
+        if not response_data["data"]:
+            return "Error: No data returned from API."
+
         image_url = response_data["data"][0]["url"]
         return image_url
 
     except requests.RequestException as e:
         return f"Error: Unable to generate image: {str(e)}"
+
 
 def generate_images(customization):
     images = {}
