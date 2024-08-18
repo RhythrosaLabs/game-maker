@@ -95,8 +95,8 @@ def generate_image(prompt, size):
 def generate_images(customization):
     images = {}
     image_prompts = {
-        'Character': f"Create a detailed, tall image of the main character with no background, easily convertible to 3D.",
-        'Enemy': f"Create a detailed, tall image of the enemy character with no background, easily convertible to 3D.",
+        'Character': f"Create a detailed, tall image of the main character with no background.",
+        'Enemy': f"Create a detailed, tall image of the enemy character with no background.",
         'Background': f"Create a wide background image or skybox.",
         'Object': f"Create an image of a key object from the world with no background."
     }
