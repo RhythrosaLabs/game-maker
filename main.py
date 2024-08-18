@@ -4,7 +4,7 @@ import json
 import os
 import zipfile
 from io import BytesIO
-from PIL import image
+from PIL import Image
 
 # Constants
 CHAT_API_URL = "https://api.openai.com/v1/chat/completions"
