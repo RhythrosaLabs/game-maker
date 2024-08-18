@@ -52,7 +52,28 @@ def generate_content(prompt, role):
         return content_text
 
     except requests.RequestException as e:
-        return f"Error: Unable to communicate with the OpenAI API."
+        return f"Error: Unable to communicate with the OpenAI API: {str(e)}"
+
+def generate_image(prompt, size):
+    data = {
+        "prompt": prompt,
+        "size": size,
+        "n": 1
+    }
+
+    try:
+        response = requests.post(DALLE_API_URL, headers=get_headers(), json=data)
+        response.raise_for_status()
+        response_data = response.json()
+        if "data" not in response_data:
+            error_message = response_data.get("error", {}).get("message", "Unknown error")
+            return f"Error: {error_message}"
+
+        image_url = response_data["data"][0]["url"]
+        return image_url
+
+    except requests.RequestException as e:
+        return f"Error: Unable to generate image: {str(e)}"
 
 def generate_game_plan(user_prompt):
     game_plan = {}
@@ -72,8 +93,11 @@ def generate_game_plan(user_prompt):
     with st.spinner('Generating dialogue...'):
         game_plan['dialogue'] = generate_content(f"Write some dialogue for the 2D game based on the plot of the game: {game_plan['game_concept']}", "dialogue writing")
 
+    with st.spinner('Generating images...'):
+        game_plan['images'] = generate_images(game_plan)
+
     with st.spinner('Generating Unity scripts...'):
-        game_plan['unity_scripts'] = generate_unity_scripts(game_plan['game_concept'], game_plan['character_concepts'], game_plan['world_concept'])
+        game_plan['unity_scripts'] = generate_unity_scripts(game_plan)
 
     with st.spinner('Generating recap...'):
         game_plan['recap'] = generate_content(f"Recap the game plan for the 2D game: {game_plan['game_concept']}", "summarization")
@@ -83,18 +107,41 @@ def generate_game_plan(user_prompt):
 
     return game_plan
 
-def generate_unity_scripts(game_concept, character_concepts, world_concept):
-    scripts = {}
+def generate_images(game_plan):
+    images = {
+        'character_image': generate_image(
+            f"Create a detailed, tall image of the main character from this game concept: {game_plan['character_concepts']}. The image should have no background and be easily converted to 3D.",
+            "1024x1792"
+        ),
+        'enemy_image': generate_image(
+            f"Create a detailed, tall image of the enemy character from this game concept: {game_plan['character_concepts']}. The image should have no background and be easily converted to 3D.",
+            "1024x1792"
+        ),
+        'background_image': generate_image(
+            f"Create a wide background image or skybox based on the world concept of this game: {game_plan['world_concept']}.",
+            "1792x1024"
+        ),
+        'object_image_1': generate_image(
+            f"Create an image of a key object from the world of this game: {game_plan['world_concept']}. The object should have no background.",
+            "1024x1024"
+        ),
+        'object_image_2': generate_image(
+            f"Create another image of a key object from the world of this game: {game_plan['world_concept']}. The object should have no background.",
+            "1024x1024"
+        )
+    }
+    return images
+
+def generate_unity_scripts(game_plan):
     descriptions = [
-        f"Unity script for the player character in a 2D game with WASD controls and space bar to jump or shoot, based on the character descriptions: {character_concepts}",
-        f"Unity script for an enemy character in a 2D game with basic AI behavior, based on the character descriptions: {character_concepts}",
-        f"Unity script for a game object in a 2D game, based on the world concept: {world_concept}",
-        f"Unity script for a second game object in a 2D game, based on the world concept: {world_concept}",
-        f"Unity script for a third game object in a 2D game, based on the world concept: {world_concept}",
-        f"Unity script for the level background in a 2D game, based on the world concept: {world_concept}"
+        f"Unity script for the player character in a 2D game with WASD controls and space bar to jump or shoot, based on the character descriptions: {game_plan['character_concepts']}",
+        f"Unity script for an enemy character in a 2D game with basic AI behavior, based on the character descriptions: {game_plan['character_concepts']}",
+        f"Unity script for a game object in a 2D game, based on the world concept: {game_plan['world_concept']}",
+        f"Unity script for a second game object in a 2D game, based on the world concept: {game_plan['world_concept']}",
+        f"Unity script for a third game object in a 2D game, based on the world concept: {game_plan['world_concept']}",
+        f"Unity script for the level background in a 2D game, based on the world concept: {game_plan['world_concept']}"
     ]
-    for i, desc in enumerate(descriptions, start=1):
-        scripts[f"script_{i}.cs"] = generate_content(desc, "Unity scripting")
+    scripts = {f"script_{i + 1}.cs": generate_content(desc, "Unity scripting") for i, desc in enumerate(descriptions)}
     return scripts
 
 def create_master_document(game_plan):
@@ -104,6 +151,10 @@ def create_master_document(game_plan):
             master_doc += f"{key.replace('_', ' ').capitalize()}:\n"
             for script_key in value:
                 master_doc += f" - {script_key}: See attached script.\n"
+        elif key == "images":
+            master_doc += f"{key.replace('_', ' ').capitalize()}:\n"
+            for image_key in value:
+                master_doc += f" - {image_key}: See attached image.\n"
         else:
             master_doc += f"{key.replace('_', ' ').capitalize()}: See attached document.\n"
     return master_doc
@@ -117,7 +168,13 @@ def create_zip(content_dict):
             elif isinstance(value, dict):
                 for sub_key, sub_value in value.items():
                     if isinstance(sub_value, str):
-                        zip_file.writestr(f"{key}/{sub_key}", sub_value)
+                        if "http" in sub_value:  # Assuming URL indicates an image
+                            # Download the image
+                            img_response = requests.get(sub_value)
+                            img_data = img_response.content
+                            zip_file.writestr(f"{key}/{sub_key}", img_data)
+                        else:
+                            zip_file.writestr(f"{key}/{sub_key}", sub_value)
 
     zip_buffer.seek(0)
     return zip_buffer.getvalue()
@@ -145,9 +202,13 @@ if st.session_state.api_key:
 
             # Display generated content
             for key, value in game_plan.items():
-                if key != "unity_scripts" and key != "master_document":
+                if key not in ["unity_scripts", "master_document", "images"]:
                     st.subheader(key.replace('_', ' ').capitalize())
                     st.write(value)
+                elif key == "images":
+                    for image_key, image_url in value.items():
+                        st.subheader(image_key.replace('_', ' ').capitalize())
+                        st.image(image_url)
 
             # Create download button for ZIP file
             zip_file = create_zip(game_plan)
@@ -158,6 +219,4 @@ if st.session_state.api_key:
                 mime="application/zip"
             )
         else:
-            st.warning("Please enter a prompt before generating the game plan.")
-else:
-    st.warning("Please set your OpenAI API key to use the application.")
+            st.warning("Please enter a prompt.")
