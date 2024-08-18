@@ -39,6 +39,8 @@ def get_headers():
         "Content-Type": "application/json"
     }
 
+
+
 def generate_content(prompt, role):
     data = {
         "model": "gpt-4o-mini",
@@ -124,6 +126,39 @@ def generate_unity_scripts(customization):
             scripts[f"{script_type.lower()}_script_{i + 1}.cs"] = script_code
     
     return scripts
+
+def generate_game_plan(user_prompt):
+    game_plan = {}
+
+    with st.spinner('Generating game concept...'):
+        game_plan['game_concept'] = generate_content(f"Invent a new 2D game concept with a detailed theme, setting, and unique features based on the following prompt: {user_prompt}. Ensure the game has WASD controls.", "game design")
+
+    with st.spinner('Generating world concept...'):
+        game_plan['world_concept'] = generate_content(f"Create a detailed world concept for the 2D game: {game_plan['game_concept']}", "world building")
+
+    with st.spinner('Generating character concepts...'):
+        game_plan['character_concepts'] = generate_content(f"Create detailed character concepts for the player and enemies in the 2D game: {game_plan['game_concept']}", "character design")
+
+    with st.spinner('Generating plot...'):
+        game_plan['plot'] = generate_content(f"Create a plot for the 2D game based on the world and characters of the game: {game_plan['game_concept']}", "storytelling")
+
+    with st.spinner('Generating dialogue...'):
+        game_plan['dialogue'] = generate_content(f"Write some dialogue for the 2D game based on the plot of the game: {game_plan['game_concept']}", "dialogue writing")
+
+    with st.spinner('Generating images...'):
+        game_plan['images'] = generate_images(st.session_state.customization)
+
+    with st.spinner('Generating Unity scripts...'):
+        game_plan['unity_scripts'] = generate_unity_scripts(st.session_state.customization)
+
+    with st.spinner('Generating recap...'):
+        game_plan['recap'] = generate_content(f"Recap the game plan for the 2D game: {game_plan['game_concept']}", "summarization")
+
+    with st.spinner('Creating master document...'):
+        game_plan['master_document'] = create_master_document(game_plan)
+
+    return game_plan
+
 
 def create_master_document(game_plan):
     master_doc = "Game Plan Master Document\n\n"
