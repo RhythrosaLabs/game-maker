@@ -10,7 +10,7 @@ import replicate
 # Constants
 CHAT_API_URL = "https://api.openai.com/v1/chat/completions"
 DALLE_API_URL = "https://api.openai.com/v1/images/generations"
-REPLICATE_API_URL = "https://api.replicate.com/v1/predictions"  # Optional
+REPLICATE_API_URL = "https://api.replicate.com/v1/predictions"
 API_KEY_FILE = "api_key.json"
 
 # Initialize session state
@@ -137,7 +137,7 @@ def generate_music(prompt):
     
     except Exception as e:
         return f"Error: Unable to generate music: {str(e)}"
-        
+
 # Generate multiple images based on customization settings
 def generate_images(customization):
     images = {}
@@ -184,7 +184,8 @@ def generate_unity_scripts(customization):
             scripts[f"{script_type.lower()}_script_{i + 1}.cs"] = script_code
     
     return scripts
-    
+
+# Create a ZIP file with all generated assets
 def create_zip(content_dict):
     zip_buffer = BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
@@ -209,7 +210,7 @@ def create_zip(content_dict):
     zip_buffer.seek(0)
     return zip_buffer
 
-# Streamlit app layout
+# Main Streamlit layout
 st.sidebar.header("API Keys")
 openai_key = st.sidebar.text_input("OpenAI API Key", type="password", value=st.session_state.api_keys['openai'] or '')
 replicate_key = st.sidebar.text_input("Replicate API Key", type="password", value=st.session_state.api_keys['replicate'] or '')
@@ -221,43 +222,39 @@ if st.sidebar.button("Save API Keys"):
 
 st.title("Game Asset Generator")
 
-tab1, tab2, tab3, tab4 = st.tabs(["Images", "Documents", "Scripts/Codes", "Advanced Options"])
+# Customization inputs
+st.header("Customization Options")
+image_types = st.multiselect("Select image types", options=st.session_state.customization['image_types'])
+script_types = st.multiselect("Select script types", options=st.session_state.customization['script_types'])
+st.session_state.customization['image_types'] = image_types
+st.session_state.customization['script_types'] = script_types
 
-with tab1:
-    st.header("Generate Images")
-    image_types = st.multiselect("Select image types", options=st.session_state.customization['image_types'])
-    if st.button("Generate Images"):
-        images = generate_images(st.session_state.customization)
-        st.session_state.generated_images = images
-        for key, url in images.items():
-            st.image(url, caption=key)
-            st.download_button(label=f"Download {key}", data=requests.get(url).content, file_name=f"{key}.png")
+# Advanced options
+st.session_state.customization['use_replicate']['convert_to_3d'] = st.checkbox("Convert images to 3D models", value=st.session_state.customization['use_replicate']['convert_to_3d'])
+st.session_state.customization['use_replicate']['generate_music'] = st.checkbox("Generate background music", value=st.session_state.customization['use_replicate']['generate_music'])
 
-with tab2:
-    st.header("Generate Documents")
-    st.write("Functionality to generate documents will be added here.")
+if st.session_state.customization['use_replicate']['generate_music']:
+    music_prompt = st.text_input("Music generation prompt", "Create background music for a 2D game level.")
+    if st.button("Generate Music"):
+        music_url = generate_music(music_prompt)
+        st.session_state.generated_music = {'background_music': music_url}
+        st.audio(music_url)
+        st.download_button(label="Download Music", data=requests.get(music_url).content, file_name="background_music.mp3")
 
-with tab3:
-    st.header("Generate Scripts/Codes")
-    if st.button("Generate Scripts"):
-        scripts = generate_unity_scripts(st.session_state.customization)
-        st.session_state.generated_scripts = scripts
-        for file_name, script_code in scripts.items():
-            st.code(script_code, language='csharp')
-            st.download_button(label=f"Download {file_name}", data=script_code, file_name=file_name)
+if st.button("Generate Assets"):
+    images = generate_images(st.session_state.customization)
+    scripts = generate_unity_scripts(st.session_state.customization)
+    
+    st.session_state.generated_images = images
+    st.session_state.generated_scripts = scripts
+    
+    for key, url in images.items():
+        st.image(url, caption=key)
+        st.download_button(label=f"Download {key}", data=requests.get(url).content, file_name=f"{key}.png")
 
-with tab4:
-    st.header("Advanced Options")
-    st.session_state.customization['use_replicate']['convert_to_3d'] = st.checkbox("Convert images to 3D models", value=st.session_state.customization['use_replicate']['convert_to_3d'])
-    st.session_state.customization['use_replicate']['generate_music'] = st.checkbox("Generate background music", value=st.session_state.customization['use_replicate']['generate_music'])
-    if st.session_state.customization['use_replicate']['generate_music']:
-        music_prompt = st.text_input("Music generation prompt", "Create background music for a 2D game level.")
-        if st.button("Generate Music"):
-            music_url = generate_music(music_prompt)
-            st.session_state.generated_music = {'background_music': music_url}
-            st.audio(music_url)
-            st.download_button(label="Download Music", data=requests.get(music_url).content, file_name="background_music.mp3")
-    st.write("Additional advanced options and settings can be added here.")
+    for file_name, script_code in scripts.items():
+        st.code(script_code, language='csharp')
+        st.download_button(label=f"Download {file_name}", data=script_code, file_name=file_name)
 
 # Generate and download ZIP of all assets
 if st.button("Generate and Download All"):
@@ -269,4 +266,3 @@ if st.button("Generate and Download All"):
     
     zip_buffer = create_zip(content_dict)
     st.download_button(label="Download All Assets", data=zip_buffer, file_name="game_assets.zip")
-
