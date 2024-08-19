@@ -8,9 +8,12 @@ from PIL import Image
 from image_to_3d import convert_to_3d
 
 # Constants
+# Constants
 CHAT_API_URL = "https://api.openai.com/v1/chat/completions"
 DALLE_API_URL = "https://api.openai.com/v1/images/generations"
 OPENAI_API_KEY_FILE = "openai_api_key.json"
+REPLICATE_API_KEY_FILE = "replicate_api_key.json"  # Ensure this constant is defined
+
 
 # Initialize session state
 if 'openai_api_key' not in st.session_state:
