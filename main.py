@@ -266,7 +266,7 @@ def main():
 
     st.header("Random Game Concept Generator")
     if st.button("Ask GPT for a Random Game Concept"):
-        concept = random_game_concept()
+        concept = generate_random_game_concept()
         st.write(concept)
 
 if __name__ == "__main__":
