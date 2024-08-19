@@ -289,10 +289,7 @@ def main():
             zip_content = create_zip(game_plan)
             st.download_button(label="Download Game Plan (ZIP)", data=zip_content, file_name="game_plan.zip", mime="application/zip")
 
-    st.header("Random Game Concept Generator")
-    if st.button("Ask GPT for a Random Game Concept"):
-        concept = generate_random_game_concept()
-        st.write(concept)
+
 
 if __name__ == "__main__":
     main()
