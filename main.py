@@ -89,6 +89,15 @@ def generate_image(prompt, size):
 
 def generate_images(game_plan, customization):
     images = {}
+    
+    # Define default sizes for different image types
+    sizes = {
+        'Character': '1024x1792',
+        'Enemy': '1024x1792',
+        'Background': '1792x1024',
+        'Object': '1024x1024'
+    }
+
     # Use details from the game plan to create specific prompts
     for img_type in customization['image_types']:
         concept_key = f"{img_type.lower()}_concept"
