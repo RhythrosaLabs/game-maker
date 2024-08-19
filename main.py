@@ -154,7 +154,10 @@ def create_zip(content_dict):
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
         for name, content in content_dict.items():
             if isinstance(content, str):
-                zf.writestr(name, content)
+                if name.endswith('.cs'):
+                    zf.writestr(name, content)
+                else:
+                    zf.writestr(name, content)
             elif isinstance(content, dict):
                 for sub_name, sub_content in content.items():
                     if isinstance(sub_content, str):
@@ -191,8 +194,9 @@ image_count = {img_type: st.sidebar.slider(f"Number of {img_type} Images", 1, 10
 script_count = {script_type: st.sidebar.slider(f"Number of {script_type} Scripts", 1, 10, st.session_state.customization['script_count'].get(script_type, 1)) for script_type in script_types}
 st.session_state.customization.update({'image_types': image_types, 'script_types': script_types, 'image_count': image_count, 'script_count': script_count})
 
-# Game concept input
-user_prompt = st.text_input("Enter Game Theme")
+# Main content
+st.header("Generate Game Assets")
+user_prompt = st.text_area("Enter Game Theme and Description", value="")
 
 if st.button("Generate Assets"):
     if not st.session_state.api_keys['openai']:
