@@ -10,7 +10,9 @@ import replicate
 # Constants
 CHAT_API_URL = "https://api.openai.com/v1/chat/completions"
 DALLE_API_URL = "https://api.openai.com/v1/images/generations"
+REPLICATE_API_URL = "https://api.replicate.com/v1/predictions"  # Optional
 API_KEY_FILE = "api_key.json"
+
 
 # Initialize session state
 if 'api_keys' not in st.session_state:
@@ -26,6 +28,7 @@ if 'customization' not in st.session_state:
     }
 
 # Load API keys from a file
+# Load API keys from a file
 def load_api_keys():
     if os.path.exists(API_KEY_FILE):
         with open(API_KEY_FILE, 'r') as file:
@@ -37,6 +40,7 @@ def load_api_keys():
 def save_api_keys(openai_key, replicate_key):
     with open(API_KEY_FILE, 'w') as file:
         json.dump({"openai": openai_key, "replicate": replicate_key}, file)
+
 
 # Get headers for OpenAI API
 def get_openai_headers():
@@ -117,23 +121,30 @@ def convert_image_to_3d(image_url):
 
 # Generate music using Replicate's MusicGen
 def generate_music(prompt):
-    headers = {
-        "Authorization": f"Token {st.session_state.api_keys['replicate']}",
-        "Content-Type": "application/json"
-    }
-    data = {
-        "input": {"text": prompt},
-        "model": "meta/musicgen"
-    }
-
+    # Initialize Replicate client
+    replicate_client = replicate.Client(api_token=st.session_state.api_keys['replicate'])
+    
     try:
-        response = requests.post("https://api.replicate.com/v1/predictions", headers=headers, json=data)
-        response.raise_for_status()
-        response_data = response.json()
-        return response_data.get('output', {}).get('url')
-    except requests.RequestException as e:
+        # Define the input for the model
+        input_data = {
+            "prompt": prompt,
+            "model_version": "stereo-large",
+            "output_format": "mp3",
+            "normalization_strategy": "peak"
+        }
+        
+        # Run the model
+        output = replicate_client.run(
+            "meta/musicgen:671ac645ce5e552cc63a54a2bbff63fcf798043055d2dac5fc9e36a837eedcfb",
+            input=input_data
+        )
+        
+        # Return the URL of the generated music
+        return output
+    
+    except Exception as e:
         return f"Error: Unable to generate music: {str(e)}"
-
+        
 # Generate multiple images based on customization settings
 def generate_images(customization):
     images = {}
@@ -181,6 +192,7 @@ def generate_unity_scripts(customization):
             scripts[f"{script_type.lower()}_script_{i + 1}.cs"] = script_code
     
     return scripts
+    
 def create_zip(content_dict):
     zip_buffer = BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
@@ -196,15 +208,12 @@ def create_zip(content_dict):
                     image.save(image_filename)
                     zip_file.write(image_filename)
                     os.remove(image_filename)
-            elif key == "documents":
-                for doc_key, doc_content in value.items():
-                    zip_file.writestr(f"{doc_key}.txt", doc_content)
             elif key == "music":
                 for music_key, music_url in value.items():
                     response = requests.get(music_url)
                     music_filename = f"{music_key}.mp3"
-                    with open(music_filename, 'wb') as f:
-                        f.write(response.content)
+                    with open(music_filename, "wb") as music_file:
+                        music_file.write(response.content)
                     zip_file.write(music_filename)
                     os.remove(music_filename)
             else:
