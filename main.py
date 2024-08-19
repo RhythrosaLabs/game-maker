@@ -97,10 +97,10 @@ def generate_images(customization):
     
     # Refined prompts for better game design output
     image_prompts = {
-        'Character': "Create a highly detailed, front-facing character concept art for a 2D game. The character should be in a neutral pose, with clearly defined features and high contrast. The design should be suitable for animation, with clear lines and distinct colors, and should represent the protagonist of a cyberpunk cat character with magical powers.",
-        'Enemy': "Design a menacing, front-facing enemy character concept art for a 2D game. The enemy should have a threatening appearance with distinctive features, a high-tech or robotic look, and be suitable for animation. The design should be highly detailed with a clear silhouette, in a neutral pose, and feature a cyberpunk theme.",
-        'Background': "Create a wide, highly detailed background image for a 2D cyberpunk city. The scene should include a clear distinction between foreground, midground, and background elements, with neon lights, tall buildings, and a dark, rainy atmosphere. The style should be consistent with a futuristic urban environment, with room for character movement in the foreground.",
-        'Object': "Create a detailed object image for a 2D game. The object should be a key item with a transparent background, easily recognizable, and fitting the cyberpunk theme. The design should be clear, with minimal unnecessary details, to ensure it integrates well into the game environment."
+        'Character': "Create a highly detailed, front-facing character concept art for a 2D game. The character should be in a neutral pose, with clearly defined features and high contrast. The design should be suitable for 3d rigging and for animation, with clear lines and distinct colors.",
+        'Enemy': "Design a menacing, front-facing enemy character concept art for a 2D game. The enemy should have a threatening appearance with distinctive features, and be suitable for 3d rigging and animation. The design should be highly detailed with a clear silhouette, in a neutral pose",
+        'Background': "Create a wide, highly detailed background image for a level of the gamey. The scene should include a clear distinction between foreground, midground, and background elements. The style should be consistent with the theme, with room for character movement in the foreground.",
+        'Object': "Create a detailed object image for a 2D game. The object should be a key item with a transparent background, easily recognizable, and fitting the theme. The design should be clear, with minimal unnecessary details, to ensure it integrates well into the game environment."
     }
     
     sizes = {
