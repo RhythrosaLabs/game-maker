@@ -245,7 +245,7 @@ def generate_game_plan(user_prompt):
     return game_plan
 
 # Streamlit app layout
-st.title("The Game Maker: Jumpstart your video game development with automated bulk generative AI asset creation")
+st.title("Automate Your Game Dev")
 
 # API Key Inputs
 st.sidebar.header("API Keys")
