@@ -1,47 +1,85 @@
-# main_app.py
-
 import streamlit as st
 import requests
 import json
 import os
 import zipfile
 from io import BytesIO
+from PIL import Image
+from image_to_3d import convert_to_3d
 
 # Constants
 CHAT_API_URL = "https://api.openai.com/v1/chat/completions"
 DALLE_API_URL = "https://api.openai.com/v1/images/generations"
-REPLICATE_API_URL = "https://api.replicate.com/v1/predictions"
-API_KEY_FILE = "api_key.json"
+OPENAI_API_KEY_FILE = "openai_api_key.json"
 
 # Initialize session state
-if 'api_key' not in st.session_state:
-    st.session_state.api_key = None
+if 'openai_api_key' not in st.session_state:
+    st.session_state.openai_api_key = None
+
+if 'replicate_api_key' not in st.session_state:
+    st.session_state.replicate_api_key = None
 
 if 'customization' not in st.session_state:
     st.session_state.customization = {
         'image_types': ['Character', 'Enemy', 'Background', 'Object'],
         'script_types': ['Player', 'Enemy', 'Game Object', 'Level Background'],
         'image_count': {'Character': 1, 'Enemy': 1, 'Background': 1, 'Object': 2},
-        'script_count': {'Player': 1, 'Enemy': 1, 'Game Object': 3, 'Level Background': 1},
-        'convert_to_3d': False
+        'script_count': {'Player': 1, 'Enemy': 1, 'Game Object': 3, 'Level Background': 1}
     }
 
-def load_api_key():
-    if os.path.exists(API_KEY_FILE):
-        with open(API_KEY_FILE, 'r') as file:
+def load_openai_api_key():
+    if os.path.exists(OPENAI_API_KEY_FILE):
+        with open(OPENAI_API_KEY_FILE, 'r') as file:
             data = json.load(file)
             return data.get('api_key')
     return None
 
-def save_api_key(api_key):
-    with open(API_KEY_FILE, 'w') as file:
-        json.dump({"api_key": api_key}, file)
+def load_replicate_api_key():
+    if os.path.exists(REPLICATE_API_KEY_FILE):
+        with open(REPLICATE_API_KEY_FILE, 'r') as file:
+            data = json.load(file)
+            return data.get('api_key')
+    return None
 
-def get_headers():
+def save_api_key(api_key, service):
+    if service == 'openai':
+        with open(OPENAI_API_KEY_FILE, 'w') as file:
+            json.dump({"api_key": api_key}, file)
+    elif service == 'replicate':
+        with open(REPLICATE_API_KEY_FILE, 'w') as file:
+            json.dump({"api_key": api_key}, file)
+
+def get_openai_headers():
     return {
-        "Authorization": f"Bearer {st.session_state.api_key}",
+        "Authorization": f"Bearer {st.session_state.openai_api_key}",
         "Content-Type": "application/json"
     }
+
+def get_replicate_headers():
+    return {
+        "Authorization": f"Bearer {st.session_state.replicate_api_key}",
+        "Content-Type": "application/json"
+    }
+
+# Streamlit UI
+st.title("Quick Actions - Game Plan Generator")
+
+# API Key Inputs
+if not st.session_state.openai_api_key:
+    st.session_state.openai_api_key = load_openai_api_key()
+
+if not st.session_state.replicate_api_key:
+    st.session_state.replicate_api_key = load_replicate_api_key()
+
+openai_api_key = st.text_input("Enter your OpenAI API key:", type="password")
+replicate_api_key = st.text_input("Enter your Replicate API key:", type="password")
+
+if st.button("Set API Keys"):
+    st.session_state.openai_api_key = openai_api_key
+    st.session_state.replicate_api_key = replicate_api_key
+    save_api_key(openai_api_key, 'openai')
+    save_api_key(replicate_api_key, 'replicate')
+    st.success("API keys set successfully!")
 
 def convert_to_3d(api_key, image_url):
     data = {
