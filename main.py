@@ -181,6 +181,37 @@ def generate_unity_scripts(customization):
             scripts[f"{script_type.lower()}_script_{i + 1}.cs"] = script_code
     
     return scripts
+def create_zip(content_dict):
+    zip_buffer = BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        for key, value in content_dict.items():
+            if key == "unity_scripts":
+                for script_key, script_value in value.items():
+                    zip_file.writestr(script_key, script_value)
+            elif key == "images":
+                for image_key, image_url in value.items():
+                    response = requests.get(image_url)
+                    image = Image.open(BytesIO(response.content))
+                    image_filename = f"{image_key}.png"
+                    image.save(image_filename)
+                    zip_file.write(image_filename)
+                    os.remove(image_filename)
+            elif key == "documents":
+                for doc_key, doc_content in value.items():
+                    zip_file.writestr(f"{doc_key}.txt", doc_content)
+            elif key == "music":
+                for music_key, music_url in value.items():
+                    response = requests.get(music_url)
+                    music_filename = f"{music_key}.mp3"
+                    with open(music_filename, 'wb') as f:
+                        f.write(response.content)
+                    zip_file.write(music_filename)
+                    os.remove(music_filename)
+            else:
+                zip_file.writestr(f"{key}.txt", value)
+    zip_buffer.seek(0)
+    return zip_buffer
+
 
 # Generate a complete game plan
 def generate_game_plan(user_prompt):
