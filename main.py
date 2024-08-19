@@ -55,7 +55,7 @@ def generate_random_game_concept(api_key):
     }
 
     try:
-        response = requests.post(CHAT_API_URL, headers=get_openai_headers(api_key), json=data)
+        response = requests.post(CHAT_API_URL, headers=get_openai_headers(), json=data)
         response.raise_for_status()
         response_data = response.json()
         if "choices" not in response_data:
@@ -97,8 +97,7 @@ def generate_image(prompt, size):
         "model": "dall-e-3",
         "prompt": prompt,
         "size": size,
-        "n": 1,
-        "response_format": "url"
+        "n": 1
     }
 
     try:
@@ -145,7 +144,6 @@ def generate_images(customization):
 
     return images
 
-
 def generate_unity_scripts(customization):
     script_descriptions = {
         'Player': "Unity script for the player character with WASD controls and space bar to jump or shoot.",
@@ -188,111 +186,59 @@ def generate_game_plan(user_prompt):
         game_plan['unity_scripts'] = generate_unity_scripts(st.session_state.customization)
 
     with st.spinner('Generating recap...'):
-        game_plan['recap'] = generate_content(f"Recap the game plan for the 2D game: {game_plan['game_concept']}", "summarization")
-
-    with st.spinner('Creating master document...'):
-        game_plan['master_document'] = create_master_document(game_plan)
+        game_plan['recap'] = generate_content(f"Recap the game plan for the 2D game based on the following components: {game_plan['game_concept']}, {game_plan['world_concept']}, {game_plan['character_concepts']}, {game_plan['plot']}, {game_plan['dialogue']}.", "recap")
 
     return game_plan
 
-def create_master_document(game_plan):
-    master_doc = "Game Plan Master Document\n\n"
-    for key, value in game_plan.items():
-        if key == "unity_scripts":
-            master_doc += f"{key.replace('_', ' ').capitalize()}:\n"
-            for script_key in value:
-                master_doc += f" - {script_key}: See attached script.\n"
-        elif key == "images":
-            master_doc += f"{key.replace('_', ' ').capitalize()}:\n"
-            for image_key in value:
-                master_doc += f" - {image_key}: See attached image.\n"
-        else:
-            master_doc += f"{key.replace('_', ' ').capitalize()}: See attached document.\n"
-    return master_doc
+# Streamlit UI
+st.title('Game Design Generator')
 
-def create_zip(content_dict):
-    zip_buffer = BytesIO()
-    with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
-        for file_name, file_content in content_dict.items():
-            if isinstance(file_content, str) and file_content.startswith("http"):
-                try:
-                    img_response = requests.get(file_content)
-                    img_response.raise_for_status()
-                    img = Image.open(BytesIO(img_response.content))
-                    img.save(file_name)
-                    zip_file.write(file_name)
-                    os.remove(file_name)
-                except requests.RequestException as e:
-                    st.error(f"Error downloading image: {str(e)}")
-            else:
-                zip_file.writestr(file_name, file_content)
-    zip_buffer.seek(0)
-    return zip_buffer
+st.sidebar.header('API Keys')
+openai_key = st.sidebar.text_input('OpenAI API Key', type="password")
+replicate_key = st.sidebar.text_input('Replicate API Key', type="password")
 
-def main():
-    st.title("Quick Actions - Game Plan Generator")
+if st.sidebar.button('Save API Keys'):
+    st.session_state.api_keys['openai'] = openai_key
+    st.session_state.api_keys['replicate'] = replicate_key
+    save_api_keys(openai_key, replicate_key)
+    st.success("API keys saved.")
 
-    if not st.session_state.api_keys['openai'] or not st.session_state.api_keys['replicate']:
-        openai_key, replicate_key = load_api_keys()
+if st.sidebar.button('Load API Keys'):
+    openai_key, replicate_key = load_api_keys()
+    if openai_key and replicate_key:
         st.session_state.api_keys['openai'] = openai_key
         st.session_state.api_keys['replicate'] = replicate_key
+        st.success("API keys loaded.")
+    else:
+        st.error("No API keys found.")
 
-    if not st.session_state.api_keys['openai'] or not st.session_state.api_keys['replicate']:
-        openai_key = st.text_input("Enter your OpenAI API key:", type="password")
-        replicate_key = st.text_input("Enter your Replicate API key:", type="password")
-        
-        if st.button("Set API Keys"):
-            st.session_state.api_keys['openai'] = openai_key
-            st.session_state.api_keys['replicate'] = replicate_key
-            save_api_keys(openai_key, replicate_key)
-            st.success("API keys set successfully!")
+st.sidebar.header('Customization')
+st.session_state.customization['image_types'] = st.sidebar.multiselect('Select Image Types', ['Character', 'Enemy', 'Background', 'Object'], default=['Character'])
+st.session_state.customization['script_types'] = st.sidebar.multiselect('Select Script Types', ['Player', 'Enemy', 'Game Object', 'Level Background'], default=['Player'])
+st.session_state.customization['image_count'] = {t: st.sidebar.number_input(f'Number of {t} Images', min_value=1, value=st.session_state.customization['image_count'].get(t, 1)) for t in st.session_state.customization['image_types']}
+st.session_state.customization['script_count'] = {t: st.sidebar.number_input(f'Number of {t} Scripts', min_value=1, value=st.session_state.customization['script_count'].get(t, 1)) for t in st.session_state.customization['script_types']}
 
-    st.subheader("Customization")
-    st.session_state.customization['image_types'] = st.multiselect(
-        "Select Image Types to Generate",
-        options=['Character', 'Enemy', 'Background', 'Object'],
-        default=['Character', 'Enemy', 'Background', 'Object']
-    )
+st.sidebar.header('Generate Game Plan')
+user_prompt = st.sidebar.text_area('Enter a prompt for generating a game concept', value='Create a thrilling adventure game with magical creatures.')
 
-    st.session_state.customization['script_types'] = st.multiselect(
-        "Select Script Types to Generate",
-        options=['Player', 'Enemy', 'Game Object', 'Level Background'],
-        default=['Player', 'Enemy', 'Game Object', 'Level Background']
-    )
+if st.sidebar.button('Generate Game Plan'):
+    game_plan = generate_game_plan(user_prompt)
+    
+    if isinstance(game_plan, dict):
+        with zipfile.ZipFile('game_plan.zip', 'w') as zf:
+            for key, content in game_plan.items():
+                if key == 'images':
+                    for img_key, img_url in content.items():
+                        img = Image.open(requests.get(img_url, stream=True).raw)
+                        img_bytes = BytesIO()
+                        img.save(img_bytes, format='PNG')
+                        zf.writestr(f'{img_key}.png', img_bytes.getvalue())
+                elif key == 'unity_scripts':
+                    for script_key, script_content in content.items():
+                        zf.writestr(script_key, script_content)
+                else:
+                    zf.writestr(f'{key}.txt', content)
 
-    for img_type in st.session_state.customization['image_types']:
-        st.session_state.customization['image_count'][img_type] = st.number_input(f"Number of {img_type} Images:", min_value=1, value=1)
-
-    for script_type in st.session_state.customization['script_types']:
-        st.session_state.customization['script_count'][script_type] = st.number_input(f"Number of {script_type} Scripts:", min_value=1, value=1)
-
-    user_prompt = st.text_area("Enter a topic or keywords for your game:", "A 2D platformer where a cat with magical powers fights robots in a cyberpunk city.")
-
-    if st.button("Generate Game Plan"):
-        if not st.session_state.api_keys['openai']:
-            st.error("Please set the OpenAI API key.")
-        else:
-            game_plan = generate_game_plan(user_prompt)
-
-            st.subheader("Generated Game Plan")
-            st.write(game_plan['game_concept'])
-            st.write(game_plan['world_concept'])
-            st.write(game_plan['character_concepts'])
-            st.write(game_plan['plot'])
-            st.write(game_plan['dialogue'])
-
-            for img_key, img_url in game_plan['images'].items():
-                st.image(img_url, caption=img_key, use_column_width=True)
-
-            st.write(game_plan['recap'])
-
-            zip_content = create_zip(game_plan)
-            st.download_button(label="Download Game Plan (ZIP)", data=zip_content, file_name="game_plan.zip", mime="application/zip")
-
-    st.header("Random Game Concept Generator")
-    if st.button("Ask GPT for a Random Game Concept"):
-        concept = generate_random_game_concept()
-        st.write(concept)
-
-if __name__ == "__main__":
-    main()
+        st.download_button(label="Download Game Plan", data=open('game_plan.zip', 'rb').read(), file_name='game_plan.zip')
+    else:
+        st.error(game_plan)
