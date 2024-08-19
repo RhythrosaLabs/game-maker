@@ -10,11 +10,13 @@ from PIL import Image
 CHAT_API_URL = "https://api.openai.com/v1/chat/completions"
 DALLE_API_URL = "https://api.openai.com/v1/images/generations"
 API_KEY_FILE = "api_key.json"
-DEFAULT_MODEL = "gpt-4o-mini"
 
 # Initialize session state
 if 'api_keys' not in st.session_state:
-    st.session_state.api_keys = {'openai': None, 'replicate': None}
+    st.session_state.api_keys = {
+        'openai': None,
+        'replicate': None
+    }
 
 if 'customization' not in st.session_state:
     st.session_state.customization = {
@@ -24,7 +26,6 @@ if 'customization' not in st.session_state:
         'script_count': {'Player': 1, 'Enemy': 1, 'Game Object': 3, 'Level Background': 1}
     }
 
-# Helper functions
 def load_api_keys():
     if os.path.exists(API_KEY_FILE):
         with open(API_KEY_FILE, 'r') as file:
@@ -42,9 +43,9 @@ def get_openai_headers():
         "Content-Type": "application/json"
     }
 
-def generate_content(prompt, role, model=DEFAULT_MODEL):
+def generate_content(prompt, role):
     data = {
-        "model": model,
+        "model": "gpt-4o-mini",
         "messages": [
             {"role": "system", "content": f"You are a helpful assistant specializing in {role}."},
             {"role": "user", "content": prompt}
@@ -59,7 +60,8 @@ def generate_content(prompt, role, model=DEFAULT_MODEL):
             error_message = response_data.get("error", {}).get("message", "Unknown error")
             return f"Error: {error_message}"
 
-        return response_data["choices"][0]["message"]["content"]
+        content_text = response_data["choices"][0]["message"]["content"]
+        return content_text
 
     except requests.RequestException as e:
         return f"Error: Unable to communicate with the OpenAI API: {str(e)}"
@@ -84,13 +86,22 @@ def generate_image(prompt, size):
         if not response_data["data"]:
             return "Error: No data returned from API."
 
-        return response_data["data"][0]["url"]
+        image_url = response_data["data"][0]["url"]
+        return image_url
 
     except requests.RequestException as e:
         return f"Error: Unable to generate image: {str(e)}"
 
-def generate_images(game_plan, customization):
+def generate_images(customization):
     images = {}
+    
+    # Refined prompts for better game design output
+    image_prompts = {
+        'Character': "Create a highly detailed, front-facing character concept art for a 2D game. The character should be in a neutral pose, with clearly defined features and high contrast. The design should be suitable for animation, with clear lines and distinct colors, and should represent the protagonist of a cyberpunk cat character with magical powers.",
+        'Enemy': "Design a menacing, front-facing enemy character concept art for a 2D game. The enemy should have a threatening appearance with distinctive features, a high-tech or robotic look, and be suitable for animation. The design should be highly detailed with a clear silhouette, in a neutral pose, and feature a cyberpunk theme.",
+        'Background': "Create a wide, highly detailed background image for a 2D cyberpunk city. The scene should include a clear distinction between foreground, midground, and background elements, with neon lights, tall buildings, and a dark, rainy atmosphere. The style should be consistent with a futuristic urban environment, with room for character movement in the foreground.",
+        'Object': "Create a detailed object image for a 2D game. The object should be a key item with a transparent background, easily recognizable, and fitting the cyberpunk theme. The design should be clear, with minimal unnecessary details, to ensure it integrates well into the game environment."
+    }
     
     sizes = {
         'Character': '1024x1792',
@@ -99,16 +110,15 @@ def generate_images(game_plan, customization):
         'Object': '1024x1024'
     }
 
-    for img_type in customization['image_types']:
-        specific_prompt = game_plan.get(f"{img_type.lower()}_concept", f"Create a highly detailed {img_type.lower()} concept for a 2D game.")
-        size = sizes.get(img_type, '1024x1024')
-
-        for i in range(customization['image_count'].get(img_type, 1)):
-            prompt = f"{specific_prompt} - Variation {i + 1}"
+    for img_type in st.session_state.customization['image_types']:
+        for i in range(st.session_state.customization['image_count'].get(img_type, 1)):
+            prompt = f"{image_prompts[img_type]} - Variation {i + 1}"
+            size = sizes[img_type]
             image_url = generate_image(prompt, size)
             images[f"{img_type.lower()}_image_{i + 1}"] = image_url
 
     return images
+
 
 def generate_unity_scripts(customization):
     script_descriptions = {
@@ -119,8 +129,8 @@ def generate_unity_scripts(customization):
     }
     
     scripts = {}
-    for script_type in customization['script_types']:
-        for i in range(customization['script_count'].get(script_type, 1)):
+    for script_type in st.session_state.customization['script_types']:
+        for i in range(st.session_state.customization['script_count'].get(script_type, 1)):
             desc = f"{script_descriptions[script_type]} - Instance {i + 1}"
             script_code = generate_content(desc, "Unity scripting")
             scripts[f"{script_type.lower()}_script_{i + 1}.cs"] = script_code
@@ -130,36 +140,32 @@ def generate_unity_scripts(customization):
 def generate_game_plan(user_prompt):
     game_plan = {}
 
-    try:
-        with st.spinner('Generating game concept...'):
-            game_plan['game_concept'] = generate_content(f"Invent a new 2D game concept with a detailed theme, setting, and unique features based on the following prompt: {user_prompt}. Ensure the game has WASD controls.", "game design")
+    with st.spinner('Generating game concept...'):
+        game_plan['game_concept'] = generate_content(f"Invent a new 2D game concept with a detailed theme, setting, and unique features based on the following prompt: {user_prompt}. Ensure the game has WASD controls.", "game design")
 
-        with st.spinner('Generating world concept...'):
-            game_plan['world_concept'] = generate_content(f"Create a detailed world concept for the 2D game: {game_plan['game_concept']}", "world building")
+    with st.spinner('Generating world concept...'):
+        game_plan['world_concept'] = generate_content(f"Create a detailed world concept for the 2D game: {game_plan['game_concept']}", "world building")
 
-        with st.spinner('Generating character concepts...'):
-            game_plan['character_concepts'] = generate_content(f"Create detailed character concepts for the player and enemies in the 2D game: {game_plan['game_concept']}", "character design")
+    with st.spinner('Generating character concepts...'):
+        game_plan['character_concepts'] = generate_content(f"Create detailed character concepts for the player and enemies in the 2D game: {game_plan['game_concept']}", "character design")
 
-        with st.spinner('Generating plot...'):
-            game_plan['plot'] = generate_content(f"Create a plot for the 2D game based on the world and characters of the game: {game_plan['game_concept']}", "storytelling")
+    with st.spinner('Generating plot...'):
+        game_plan['plot'] = generate_content(f"Create a plot for the 2D game based on the world and characters of the game: {game_plan['game_concept']}", "storytelling")
 
-        with st.spinner('Generating dialogue...'):
-            game_plan['dialogue'] = generate_content(f"Write some dialogue for the 2D game based on the plot of the game: {game_plan['game_concept']}", "dialogue writing")
+    with st.spinner('Generating dialogue...'):
+        game_plan['dialogue'] = generate_content(f"Write some dialogue for the 2D game based on the plot of the game: {game_plan['game_concept']}", "dialogue writing")
 
-        with st.spinner('Generating images...'):
-            game_plan['images'] = generate_images(game_plan, st.session_state.customization)
+    with st.spinner('Generating images...'):
+        game_plan['images'] = generate_images(st.session_state.customization)
 
-        with st.spinner('Generating Unity scripts...'):
-            game_plan['unity_scripts'] = generate_unity_scripts(st.session_state.customization)
+    with st.spinner('Generating Unity scripts...'):
+        game_plan['unity_scripts'] = generate_unity_scripts(st.session_state.customization)
 
-        with st.spinner('Generating recap...'):
-            game_plan['recap'] = generate_content(f"Recap the game plan for the 2D game: {game_plan['game_concept']}", "summarization")
+    with st.spinner('Generating recap...'):
+        game_plan['recap'] = generate_content(f"Recap the game plan for the 2D game: {game_plan['game_concept']}", "summarization")
 
-        with st.spinner('Creating master document...'):
-            game_plan['master_document'] = create_master_document(game_plan)
-
-    except Exception as e:
-        st.error(f"An error occurred during the game plan generation: {str(e)}")
+    with st.spinner('Creating master document...'):
+        game_plan['master_document'] = create_master_document(game_plan)
 
     return game_plan
 
@@ -188,6 +194,7 @@ def create_zip(content_dict):
                 for sub_key, sub_value in value.items():
                     if isinstance(sub_value, str):
                         if "http" in sub_value:  # Assuming URL indicates an image
+                            # Download the image
                             img_response = requests.get(sub_value)
                             img_data = img_response.content
                             zip_file.writestr(f"{key}/{sub_key}", img_data)
@@ -209,44 +216,56 @@ if not st.session_state.api_keys['openai'] or not st.session_state.api_keys['rep
 if not st.session_state.api_keys['openai'] or not st.session_state.api_keys['replicate']:
     openai_key = st.text_input("Enter your OpenAI API key:", type="password")
     replicate_key = st.text_input("Enter your Replicate API key:", type="password")
-
-    if st.button("Save API keys"):
+    
+    if st.button("Set API Keys"):
         st.session_state.api_keys['openai'] = openai_key
         st.session_state.api_keys['replicate'] = replicate_key
         save_api_keys(openai_key, replicate_key)
-        st.success("API keys saved successfully!")
-
-else:
-    st.success("API keys loaded successfully!")
-
-# User Input
-user_prompt = st.text_area("Enter your game idea or concept:")
+        st.success("API keys set successfully!")
 
 # Customization Options
-st.subheader("Customize Generation")
-st.session_state.customization['image_types'] = st.multiselect("Select image types to generate:", st.session_state.customization['image_types'])
-st.session_state.customization['script_types'] = st.multiselect("Select Unity script types to generate:", st.session_state.customization['script_types'])
+st.subheader("Customization")
+st.session_state.customization['image_types'] = st.multiselect(
+    "Select Image Types to Generate",
+    options=['Character', 'Enemy', 'Background', 'Object'],
+    default=['Character', 'Enemy', 'Background', 'Object']
+)
 
+st.session_state.customization['script_types'] = st.multiselect(
+    "Select Script Types to Generate",
+    options=['Player', 'Enemy', 'Game Object', 'Level Background'],
+    default=['Player', 'Enemy', 'Game Object', 'Level Background']
+)
+
+# Number of images and scripts
 for img_type in st.session_state.customization['image_types']:
-    st.session_state.customization['image_count'][img_type] = st.slider(f"Number of {img_type} images:", 1, 5, st.session_state.customization['image_count'].get(img_type, 1))
+    st.session_state.customization['image_count'][img_type] = st.number_input(f"Number of {img_type} Images:", min_value=1, value=1)
 
 for script_type in st.session_state.customization['script_types']:
-    st.session_state.customization['script_count'][script_type] = st.slider(f"Number of {script_type} scripts:", 1, 5, st.session_state.customization['script_count'].get(script_type, 1))
+    st.session_state.customization['script_count'][script_type] = st.number_input(f"Number of {script_type} Scripts:", min_value=1, value=1)
 
-# Generate Button
+# User Prompt Input
+user_prompt = st.text_area("Enter a topic or keywords for your game:", "A 2D platformer where a cat with magical powers fights robots in a cyberpunk city.")
+
 if st.button("Generate Game Plan"):
-    with st.spinner('Generating your game plan...'):
+    if not st.session_state.api_keys['openai']:
+        st.error("Please set the OpenAI API key.")
+    else:
         game_plan = generate_game_plan(user_prompt)
-        if game_plan:
-            st.success("Game plan generated successfully!")
 
-            # Download Zip File
-            zip_data = create_zip(game_plan)
-            st.download_button(
-                label="Download Game Plan",
-                data=zip_data,
-                file_name="game_plan.zip",
-                mime="application/zip"
-            )
-        else:
-            st.error("Failed to generate game plan.")
+        # Display the generated game plan
+        st.subheader("Generated Game Plan")
+        st.write(game_plan['game_concept'])
+        st.write(game_plan['world_concept'])
+        st.write(game_plan['character_concepts'])
+        st.write(game_plan['plot'])
+        st.write(game_plan['dialogue'])
+
+        for img_key, img_url in game_plan['images'].items():
+            st.image(img_url, caption=img_key, use_column_width=True)
+
+        st.write(game_plan['recap'])
+
+        # Downloadable content
+        zip_content = create_zip(game_plan)
+        st.download_button(label="Download Game Plan (ZIP)", data=zip_content, file_name="game_plan.zip", mime="application/zip")
