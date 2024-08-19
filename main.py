@@ -92,15 +92,13 @@ def generate_image(prompt, size):
     except requests.RequestException as e:
         return f"Error: Unable to generate image: {str(e)}"
 
-def generate_images(customization):
+def generate_images(api_key, theme, customization):
     images = {}
-    
-    # Refined prompts for better game design output
     image_prompts = {
-        'Character': "Create a highly detailed, front-facing character concept art for a 2D game. The character should be in a neutral pose, with clearly defined features and high contrast. The design should be suitable for animation, with clear lines and distinct colors, and should represent the protagonist of a cyberpunk cat character with magical powers.",
-        'Enemy': "Design a menacing, front-facing enemy character concept art for a 2D game. The enemy should have a threatening appearance with distinctive features, a high-tech or robotic look, and be suitable for animation. The design should be highly detailed with a clear silhouette, in a neutral pose, and feature a cyberpunk theme.",
-        'Background': "Create a wide, highly detailed background image for a 2D cyberpunk city. The scene should include a clear distinction between foreground, midground, and background elements, with neon lights, tall buildings, and a dark, rainy atmosphere. The style should be consistent with a futuristic urban environment, with room for character movement in the foreground.",
-        'Object': "Create a detailed object image for a 2D game. The object should be a key item with a transparent background, easily recognizable, and fitting the cyberpunk theme. The design should be clear, with minimal unnecessary details, to ensure it integrates well into the game environment."
+        'Character': f"Create a detailed image of a main character for a game with a theme of '{theme}'. The character should be designed for ease of use in game development.",
+        'Enemy': f"Create a detailed image of an enemy character for a game with a theme of '{theme}'. The enemy should fit the overall design of the game and be ready for game development.",
+        'Background': f"Create a wide background or skybox image for a game with a theme of '{theme}'. The background should complement the game environment and be suitable for level design.",
+        'Object': f"Create an image of a key object for a game with a theme of '{theme}'. The object should be designed to fit seamlessly into the game world."
     }
     
     sizes = {
@@ -110,22 +108,22 @@ def generate_images(customization):
         'Object': '1024x1024'
     }
 
-    for img_type in st.session_state.customization['image_types']:
-        for i in range(st.session_state.customization['image_count'].get(img_type, 1)):
-            prompt = f"{image_prompts[img_type]} - Variation {i + 1}"
+    for img_type in customization['image_types']:
+        for i in range(customization['image_count'].get(img_type, 1)):
+            prompt = f"{image_prompts[img_type]} - Instance {i + 1}"
             size = sizes[img_type]
-            image_url = generate_image(prompt, size)
+            image_url = generate_image(api_key, prompt, size)
             images[f"{img_type.lower()}_image_{i + 1}"] = image_url
 
     return images
 
 
-def generate_unity_scripts(customization):
+def generate_unity_scripts(api_key, theme, customization):
     script_descriptions = {
-        'Player': "Unity script for the player character with WASD controls and space bar to jump or shoot.",
-        'Enemy': "Unity script for an enemy character with basic AI behavior.",
-        'Game Object': "Unity script for a game object with basic functionality.",
-        'Level Background': "Unity script for the level background."
+        'Player': f"Unity script for the player character in a game with the theme '{theme}'. The script should include basic controls suitable for the game's design.",
+        'Enemy': f"Unity script for an enemy character in a game with the theme '{theme}'. The script should include basic AI behavior fitting the game's style.",
+        'Game Object': f"Unity script for a game object in a game with the theme '{theme}'. The script should provide basic functionality and be adaptable to the game's needs.",
+        'Level Background': f"Unity script for managing the level background in a game with the theme '{theme}'. The script should handle background changes and fitting seamlessly into the game environment."
     }
     
     scripts = {}
