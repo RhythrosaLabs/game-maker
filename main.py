@@ -13,10 +13,7 @@ API_KEY_FILE = "api_key.json"
 
 # Initialize session state
 if 'api_keys' not in st.session_state:
-    st.session_state.api_keys = {
-        'openai': None,
-        'replicate': None
-    }
+    st.session_state.api_keys = {'openai': None, 'replicate': None}
 
 if 'customization' not in st.session_state:
     st.session_state.customization = {
@@ -60,8 +57,7 @@ def generate_content(prompt, role):
             error_message = response_data.get("error", {}).get("message", "Unknown error")
             return f"Error: {error_message}"
 
-        content_text = response_data["choices"][0]["message"]["content"]
-        return content_text
+        return response_data["choices"][0]["message"]["content"]
 
     except requests.RequestException as e:
         return f"Error: Unable to communicate with the OpenAI API: {str(e)}"
@@ -86,39 +82,29 @@ def generate_image(prompt, size):
         if not response_data["data"]:
             return "Error: No data returned from API."
 
-        image_url = response_data["data"][0]["url"]
-        return image_url
+        return response_data["data"][0]["url"]
 
     except requests.RequestException as e:
         return f"Error: Unable to generate image: {str(e)}"
 
-def generate_images(customization):
+def generate_images(game_plan, customization):
     images = {}
-    
-    # Refined prompts for better game design output
-    image_prompts = {
-        'Character': "Create a highly detailed, front-facing character concept art for a 2D game. The character should be in a neutral pose, with clearly defined features and high contrast. The design should be suitable for animation, with clear lines and distinct colors, and should represent the protagonist of a cyberpunk cat character with magical powers.",
-        'Enemy': "Design a menacing, front-facing enemy character concept art for a 2D game. The enemy should have a threatening appearance with distinctive features, a high-tech or robotic look, and be suitable for animation. The design should be highly detailed with a clear silhouette, in a neutral pose, and feature a cyberpunk theme.",
-        'Background': "Create a wide, highly detailed background image for a 2D cyberpunk city. The scene should include a clear distinction between foreground, midground, and background elements, with neon lights, tall buildings, and a dark, rainy atmosphere. The style should be consistent with a futuristic urban environment, with room for character movement in the foreground.",
-        'Object': "Create a detailed object image for a 2D game. The object should be a key item with a transparent background, easily recognizable, and fitting the cyberpunk theme. The design should be clear, with minimal unnecessary details, to ensure it integrates well into the game environment."
-    }
-    
-    sizes = {
-        'Character': '1024x1792',
-        'Enemy': '1024x1792',
-        'Background': '1792x1024',
-        'Object': '1024x1024'
-    }
+    # Use details from the game plan to create specific prompts
+    for img_type in customization['image_types']:
+        concept_key = f"{img_type.lower()}_concept"
+        if concept_key in game_plan:
+            specific_prompt = game_plan[concept_key]
+        else:
+            specific_prompt = f"Create a highly detailed {img_type.lower()} concept for a 2D game."
 
-    for img_type in st.session_state.customization['image_types']:
-        for i in range(st.session_state.customization['image_count'].get(img_type, 1)):
-            prompt = f"{image_prompts[img_type]} - Variation {i + 1}"
-            size = sizes[img_type]
+        size = sizes.get(img_type, '1024x1024')
+
+        for i in range(customization['image_count'].get(img_type, 1)):
+            prompt = f"{specific_prompt} - Variation {i + 1}"
             image_url = generate_image(prompt, size)
             images[f"{img_type.lower()}_image_{i + 1}"] = image_url
 
     return images
-
 
 def generate_unity_scripts(customization):
     script_descriptions = {
@@ -129,8 +115,8 @@ def generate_unity_scripts(customization):
     }
     
     scripts = {}
-    for script_type in st.session_state.customization['script_types']:
-        for i in range(st.session_state.customization['script_count'].get(script_type, 1)):
+    for script_type in customization['script_types']:
+        for i in range(customization['script_count'].get(script_type, 1)):
             desc = f"{script_descriptions[script_type]} - Instance {i + 1}"
             script_code = generate_content(desc, "Unity scripting")
             scripts[f"{script_type.lower()}_script_{i + 1}.cs"] = script_code
@@ -156,7 +142,7 @@ def generate_game_plan(user_prompt):
         game_plan['dialogue'] = generate_content(f"Write some dialogue for the 2D game based on the plot of the game: {game_plan['game_concept']}", "dialogue writing")
 
     with st.spinner('Generating images...'):
-        game_plan['images'] = generate_images(st.session_state.customization)
+        game_plan['images'] = generate_images(game_plan, st.session_state.customization)
 
     with st.spinner('Generating Unity scripts...'):
         game_plan['unity_scripts'] = generate_unity_scripts(st.session_state.customization)
@@ -217,55 +203,23 @@ if not st.session_state.api_keys['openai'] or not st.session_state.api_keys['rep
     openai_key = st.text_input("Enter your OpenAI API key:", type="password")
     replicate_key = st.text_input("Enter your Replicate API key:", type="password")
     
-    if st.button("Set API Keys"):
+    if st.button("Save API keys"):
         st.session_state.api_keys['openai'] = openai_key
         st.session_state.api_keys['replicate'] = replicate_key
         save_api_keys(openai_key, replicate_key)
-        st.success("API keys set successfully!")
 
-# Customization Options
-st.subheader("Customization")
-st.session_state.customization['image_types'] = st.multiselect(
-    "Select Image Types to Generate",
-    options=['Character', 'Enemy', 'Background', 'Object'],
-    default=['Character', 'Enemy', 'Background', 'Object']
-)
+else:
+    st.write("API keys are set.")
 
-st.session_state.customization['script_types'] = st.multiselect(
-    "Select Script Types to Generate",
-    options=['Player', 'Enemy', 'Game Object', 'Level Background'],
-    default=['Player', 'Enemy', 'Game Object', 'Level Background']
-)
+# Game Plan Generation
+user_prompt = st.text_area("Describe the type of 2D game you'd like to create:")
+generate_button = st.button("Generate Game Plan")
 
-# Number of images and scripts
-for img_type in st.session_state.customization['image_types']:
-    st.session_state.customization['image_count'][img_type] = st.number_input(f"Number of {img_type} Images:", min_value=1, value=1)
+if generate_button:
+    game_plan = generate_game_plan(user_prompt)
+    st.text_area("Game Plan", game_plan['recap'], height=300)
 
-for script_type in st.session_state.customization['script_types']:
-    st.session_state.customization['script_count'][script_type] = st.number_input(f"Number of {script_type} Scripts:", min_value=1, value=1)
-
-# User Prompt Input
-user_prompt = st.text_area("Enter a topic or keywords for your game:", "A 2D platformer where a cat with magical powers fights robots in a cyberpunk city.")
-
-if st.button("Generate Game Plan"):
-    if not st.session_state.api_keys['openai']:
-        st.error("Please set the OpenAI API key.")
-    else:
-        game_plan = generate_game_plan(user_prompt)
-
-        # Display the generated game plan
-        st.subheader("Generated Game Plan")
-        st.write(game_plan['game_concept'])
-        st.write(game_plan['world_concept'])
-        st.write(game_plan['character_concepts'])
-        st.write(game_plan['plot'])
-        st.write(game_plan['dialogue'])
-
-        for img_key, img_url in game_plan['images'].items():
-            st.image(img_url, caption=img_key, use_column_width=True)
-
-        st.write(game_plan['recap'])
-
-        # Downloadable content
+    if st.button("Download Game Plan and Assets"):
         zip_content = create_zip(game_plan)
-        st.download_button(label="Download Game Plan (ZIP)", data=zip_content, file_name="game_plan.zip", mime="application/zip")
+        st.download_button(label="Download ZIP", data=zip_content, file_name="game_plan.zip", mime="application/zip")
+
