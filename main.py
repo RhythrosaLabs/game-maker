@@ -23,7 +23,8 @@ if 'customization' not in st.session_state:
         'image_types': ['Character', 'Enemy', 'Background', 'Object'],
         'script_types': ['Player', 'Enemy', 'Game Object', 'Level Background'],
         'image_count': {'Character': 1, 'Enemy': 1, 'Background': 1, 'Object': 2},
-        'script_count': {'Player': 1, 'Enemy': 1, 'Game Object': 3, 'Level Background': 1}
+        'script_count': {'Player': 1, 'Enemy': 1, 'Game Object': 3, 'Level Background': 1},
+        'use_replicate': {'convert_to_3d': False, 'generate_music': False}
     }
 
 # Load API keys from a file
@@ -97,6 +98,44 @@ def generate_image(prompt, size):
     except requests.RequestException as e:
         return f"Error: Unable to generate image: {str(e)}"
 
+# Convert image to 3D model using Replicate API
+def convert_image_to_3d(image_url):
+    headers = {
+        "Authorization": f"Token {st.session_state.api_keys['replicate']}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "input": {"image": image_url},
+        "model": "adirik/wonder3d"
+    }
+
+    try:
+        response = requests.post("https://api.replicate.com/v1/predictions", headers=headers, json=data)
+        response.raise_for_status()
+        response_data = response.json()
+        return response_data.get('output', {}).get('url')
+    except requests.RequestException as e:
+        return f"Error: Unable to convert image to 3D model: {str(e)}"
+
+# Generate music using Replicate's MusicGen
+def generate_music(prompt):
+    headers = {
+        "Authorization": f"Token {st.session_state.api_keys['replicate']}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "input": {"text": prompt},
+        "model": "meta/musicgen"
+    }
+
+    try:
+        response = requests.post("https://api.replicate.com/v1/predictions", headers=headers, json=data)
+        response.raise_for_status()
+        response_data = response.json()
+        return response_data.get('output', {}).get('url')
+    except requests.RequestException as e:
+        return f"Error: Unable to generate music: {str(e)}"
+
 # Generate multiple images based on customization settings
 def generate_images(customization):
     images = {}
@@ -121,6 +160,8 @@ def generate_images(customization):
             prompt = f"{image_prompts[img_type]} - Variation {i + 1}"
             size = sizes[img_type]
             image_url = generate_image(prompt, size)
+            if st.session_state.customization['use_replicate']['convert_to_3d']:
+                image_url = convert_image_to_3d(image_url)
             images[f"{img_type.lower()}_image_{i + 1}"] = image_url
 
     return images
@@ -159,43 +200,25 @@ def generate_game_plan(user_prompt):
     with st.spinner('Generating plot...'):
         game_plan['plot'] = generate_content(f"Create a plot for the 2D game based on the world and characters of the game: {game_plan['game_concept']}", "storytelling")
 
-    with st.spinner('Generating dialogue...'):
-        game_plan['dialogue'] = generate_content(f"Write some dialogue for the 2D game based on the plot of the game: {game_plan['game_concept']}", "dialogue writing")
+    with st.spinner('Generating level design...'):
+        game_plan['level_design'] = generate_content(f"Design the first three levels for the 2D game: {game_plan['game_concept']}", "level design")
 
     with st.spinner('Generating images...'):
         game_plan['images'] = generate_images(st.session_state.customization)
 
     with st.spinner('Generating Unity scripts...'):
         game_plan['unity_scripts'] = generate_unity_scripts(st.session_state.customization)
-
-    with st.spinner('Generating recap...'):
-        game_plan['recap'] = generate_content(f"Recap the game plan for the 2D game: {game_plan['game_concept']}", "summarization")
-
-    with st.spinner('Creating master document...'):
-        game_plan['master_document'] = create_master_document(game_plan)
+    
+    if st.session_state.customization['use_replicate']['generate_music']:
+        with st.spinner('Generating music...'):
+            game_plan['music'] = generate_music(f"Generate background music for a 2D game based on the following concept: {game_plan['game_concept']}")
 
     return game_plan
 
-# Create a master document summarizing the game plan
-def create_master_document(game_plan):
-    master_doc = "Game Plan Master Document\n\n"
-    for key, value in game_plan.items():
-        if key == "unity_scripts":
-            master_doc += f"{key.replace('_', ' ').capitalize()}:\n"
-            for script_key in value:
-                master_doc += f" - {script_key}: See attached script.\n"
-        elif key == "images":
-            master_doc += f"{key.replace('_', ' ').capitalize()}:\n"
-            for image_key in value:
-                master_doc += f" - {image_key}: See attached image.\n"
-        else:
-            master_doc += f"{key.replace('_', ' ').capitalize()}: See attached document.\n"
-    return master_doc
-
-# Create a ZIP file from the generated content
+# Create ZIP file from the generated content
 def create_zip(content_dict):
     zip_buffer = BytesIO()
-    with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
         for key, value in content_dict.items():
             if key == "unity_scripts":
                 for script_key, script_value in value.items():
@@ -239,6 +262,11 @@ for img_type in st.session_state.customization['image_types']:
 st.sidebar.subheader("Script Customization")
 for script_type in st.session_state.customization['script_types']:
     st.session_state.customization['script_count'][script_type] = st.sidebar.number_input(f"Number of {script_type} Scripts:", min_value=1, value=st.session_state.customization['script_count'][script_type])
+
+# Replicate options
+st.sidebar.subheader("Replicate Options")
+st.session_state.customization['use_replicate']['convert_to_3d'] = st.sidebar.checkbox("Convert images to 3D models", value=st.session_state.customization['use_replicate']['convert_to_3d'])
+st.session_state.customization['use_replicate']['generate_music'] = st.sidebar.checkbox("Generate background music", value=st.session_state.customization['use_replicate']['generate_music'])
 
 # Game plan generation
 user_prompt = st.text_area("Enter a game idea or theme:")
