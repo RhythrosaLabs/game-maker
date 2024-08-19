@@ -96,11 +96,10 @@ def generate_image(prompt, size):
 def generate_images(customization):
     images = {}
     
-    # Refined prompts for better game design output
     image_prompts = {
         'Character': "Create a highly detailed, front-facing character concept art for a 2D game. The character should be in a neutral pose, with clearly defined features and high contrast. The design should be suitable for 3d rigging and for animation, with clear lines and distinct colors.",
         'Enemy': "Design a menacing, front-facing enemy character concept art for a 2D game. The enemy should have a threatening appearance with distinctive features, and be suitable for 3d rigging and animation. The design should be highly detailed with a clear silhouette, in a neutral pose",
-        'Background': "Create a wide, highly detailed background image for a level of the gamey. The scene should include a clear distinction between foreground, midground, and background elements. The style should be consistent with the theme, with room for character movement in the foreground.",
+        'Background': "Create a wide, highly detailed background image for a level of the game. The scene should include a clear distinction between foreground, midground, and background elements. The style should be consistent with the theme, with room for character movement in the foreground.",
         'Object': "Create a detailed object image for a 2D game. The object should be a key item with a transparent background, easily recognizable, and fitting the theme. The design should be clear, with minimal unnecessary details, to ensure it integrates well into the game environment."
     }
     
@@ -191,83 +190,48 @@ def create_zip(content_dict):
         for file_name, file_content in content_dict.items():
             if isinstance(file_content, str) and file_content.startswith("http"):
                 try:
-                    img_response = requests.get(file_content)
-                    img_response.raise_for_status()
-                    img = Image.open(BytesIO(img_response.content))
-                    img.save(file_name)
-                    zip_file.write(file_name)
-                    os.remove(file_name)
+                    image_response = requests.get(file_content)
+                    if image_response.status_code == 200:
+                        image = Image.open(BytesIO(image_response.content))
+                        image_file_name = f"{file_name}.png"
+                        with BytesIO() as buffer:
+                            image.save(buffer, format="PNG")
+                            buffer.seek(0)
+                            zip_file.writestr(image_file_name, buffer.read())
                 except requests.RequestException as e:
-                    st.error(f"Error downloading image: {str(e)}")
-            else:
+                    st.error(f"Error fetching image: {e}")
+            elif file_name.endswith(".cs"):
                 zip_file.writestr(file_name, file_content)
+            else:
+                zip_file.writestr(f"{file_name}.txt", file_content)
     zip_buffer.seek(0)
     return zip_buffer
 
 def main():
-    st.title("Quick Actions - Game Plan Generator")
+    st.title("Game Plan Generator")
 
-    if not st.session_state.api_keys['openai'] or not st.session_state.api_keys['replicate']:
-        openai_key, replicate_key = load_api_keys()
+    openai_key = st.text_input("OpenAI API Key", type="password")
+    replicate_key = st.text_input("Replicate API Key", type="password")
+
+    if st.button("Save API Keys"):
         st.session_state.api_keys['openai'] = openai_key
         st.session_state.api_keys['replicate'] = replicate_key
+        save_api_keys(openai_key, replicate_key)
+        st.success("API Keys saved successfully.")
 
-    if not st.session_state.api_keys['openai'] or not st.session_state.api_keys['replicate']:
-        openai_key = st.text_input("Enter your OpenAI API key:", type="password")
-        replicate_key = st.text_input("Enter your Replicate API key:", type="password")
-        
-        if st.button("Set API Keys"):
-            st.session_state.api_keys['openai'] = openai_key
-            st.session_state.api_keys['replicate'] = replicate_key
-            save_api_keys(openai_key, replicate_key)
-            st.success("API keys set successfully!")
-
-    st.subheader("Customization")
-    st.session_state.customization['image_types'] = st.multiselect(
-        "Select Image Types to Generate",
-        options=['Character', 'Enemy', 'Background', 'Object'],
-        default=['Character', 'Enemy', 'Background', 'Object']
-    )
-
-    st.session_state.customization['script_types'] = st.multiselect(
-        "Select Script Types to Generate",
-        options=['Player', 'Enemy', 'Game Object', 'Level Background'],
-        default=['Player', 'Enemy', 'Game Object', 'Level Background']
-    )
-
-    for img_type in st.session_state.customization['image_types']:
-        st.session_state.customization['image_count'][img_type] = st.number_input(f"Number of {img_type} Images:", min_value=1, value=1)
-
-    for script_type in st.session_state.customization['script_types']:
-        st.session_state.customization['script_count'][script_type] = st.number_input(f"Number of {script_type} Scripts:", min_value=1, value=1)
-
-    user_prompt = st.text_area("Enter a topic or keywords for your game:", "A 2D platformer where a cat with magical powers fights robots in a cyberpunk city.")
-
-    if st.button("Generate Game Plan"):
-        if not st.session_state.api_keys['openai']:
-            st.error("Please set the OpenAI API key.")
-        else:
+    if st.button("Generate Random Game Concept"):
+        user_prompt = st.text_input("Describe your game concept")
+        if user_prompt:
             game_plan = generate_game_plan(user_prompt)
 
-            st.subheader("Generated Game Plan")
-            st.write(game_plan['game_concept'])
-            st.write(game_plan['world_concept'])
-            st.write(game_plan['character_concepts'])
-            st.write(game_plan['plot'])
-            st.write(game_plan['dialogue'])
-
-            for img_key, img_url in game_plan['images'].items():
-                st.image(img_url, caption=img_key, use_column_width=True)
-
-            st.write(game_plan['recap'])
-
-            zip_content = create_zip(game_plan)
-            st.download_button(label="Download Game Plan (ZIP)", data=zip_content, file_name="game_plan.zip", mime="application/zip")
-
-    st.header("Random Game Concept Generator")
-    if st.button("Ask GPT for a Random Game Concept"):
-        concept = generate_random_game_concept()
-        st.write(concept)
+            with st.spinner('Creating ZIP file...'):
+                zip_buffer = create_zip(game_plan)
+                st.download_button(
+                    label="Download Game Plan",
+                    data=zip_buffer,
+                    file_name="game_plan.zip",
+                    mime="application/zip"
+                )
 
 if __name__ == "__main__":
     main()
