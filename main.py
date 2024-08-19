@@ -13,7 +13,6 @@ DALLE_API_URL = "https://api.openai.com/v1/images/generations"
 REPLICATE_API_URL = "https://api.replicate.com/v1/predictions"  # Optional
 API_KEY_FILE = "api_key.json"
 
-
 # Initialize session state
 if 'api_keys' not in st.session_state:
     st.session_state.api_keys = {'openai': None, 'replicate': None}
@@ -28,7 +27,6 @@ if 'customization' not in st.session_state:
     }
 
 # Load API keys from a file
-# Load API keys from a file
 def load_api_keys():
     if os.path.exists(API_KEY_FILE):
         with open(API_KEY_FILE, 'r') as file:
@@ -40,7 +38,6 @@ def load_api_keys():
 def save_api_keys(openai_key, replicate_key):
     with open(API_KEY_FILE, 'w') as file:
         json.dump({"openai": openai_key, "replicate": replicate_key}, file)
-
 
 # Get headers for OpenAI API
 def get_openai_headers():
@@ -121,11 +118,9 @@ def convert_image_to_3d(image_url):
 
 # Generate music using Replicate's MusicGen
 def generate_music(prompt):
-    # Initialize Replicate client
     replicate_client = replicate.Client(api_token=st.session_state.api_keys['replicate'])
     
     try:
-        # Define the input for the model
         input_data = {
             "prompt": prompt,
             "model_version": "stereo-large",
@@ -133,27 +128,24 @@ def generate_music(prompt):
             "normalization_strategy": "peak"
         }
         
-        # Run the model
         output = replicate_client.run(
             "meta/musicgen:671ac645ce5e552cc63a54a2bbff63fcf798043055d2dac5fc9e36a837eedcfb",
             input=input_data
         )
         
-        # Return the URL of the generated music
         return output
     
     except Exception as e:
         return f"Error: Unable to generate music: {str(e)}"
-        
+
 # Generate multiple images based on customization settings
 def generate_images(customization):
     images = {}
     
-    # Refined prompts for better game design output
     image_prompts = {
         'Character': "Create a highly detailed, front-facing character concept art for a 2D game. The character should be in a neutral pose, with clearly defined features and high contrast. The design should be suitable for 3d rigging and for animation, with clear lines and distinct colors.",
         'Enemy': "Design a menacing, front-facing enemy character concept art for a 2D game. The enemy should have a threatening appearance with distinctive features, and be suitable for 3d rigging and animation. The design should be highly detailed with a clear silhouette, in a neutral pose",
-        'Background': "Create a wide, highly detailed background image for a level of the gamey. The scene should include a clear distinction between foreground, midground, and background elements. The style should be consistent with the theme, with room for character movement in the foreground.",
+        'Background': "Create a wide, highly detailed background image for a level of the game. The scene should include a clear distinction between foreground, midground, and background elements. The style should be consistent with the theme, with room for character movement in the foreground.",
         'Object': "Create a detailed object image for a 2D game. The object should be a key item with a transparent background, easily recognizable, and fitting the theme. The design should be clear, with minimal unnecessary details, to ensure it integrates well into the game environment."
     }
     
@@ -192,7 +184,7 @@ def generate_unity_scripts(customization):
             scripts[f"{script_type.lower()}_script_{i + 1}.cs"] = script_code
     
     return scripts
-    
+
 def create_zip(content_dict):
     zip_buffer = BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
@@ -208,113 +200,69 @@ def create_zip(content_dict):
                     image.save(image_filename)
                     zip_file.write(image_filename)
                     os.remove(image_filename)
-            elif key == "music":
-                for music_key, music_url in value.items():
-                    response = requests.get(music_url)
-                    music_filename = f"{music_key}.mp3"
-                    with open(music_filename, "wb") as music_file:
-                        music_file.write(response.content)
-                    zip_file.write(music_filename)
-                    os.remove(music_filename)
-            else:
-                zip_file.writestr(f"{key}.txt", value)
     zip_buffer.seek(0)
     return zip_buffer
 
+# Define main function
+def main():
+    st.title("Game Asset Generator")
 
-# Generate a complete game plan
-def generate_game_plan(user_prompt):
-    game_plan = {}
+    st.sidebar.header("API Keys")
+    openai_key = st.sidebar.text_input("OpenAI API Key", value=st.session_state.api_keys.get('openai'))
+    replicate_key = st.sidebar.text_input("Replicate API Key", value=st.session_state.api_keys.get('replicate'))
+    if st.sidebar.button("Save API Keys"):
+        save_api_keys(openai_key, replicate_key)
+        st.session_state.api_keys = {'openai': openai_key, 'replicate': replicate_key}
+        st.success("API keys saved!")
 
-    with st.spinner('Generating game concept...'):
-        game_plan['game_concept'] = generate_content(f"Invent a new 2D game concept with a detailed theme, setting, and unique features based on the following prompt: {user_prompt}. Ensure the game has WASD controls.", "game design")
+    st.sidebar.header("Customization")
+    st.session_state.customization['image_types'] = st.sidebar.multiselect("Select Image Types", ["Character", "Enemy", "Background", "Object"], default=st.session_state.customization['image_types'])
+    st.session_state.customization['script_types'] = st.sidebar.multiselect("Select Script Types", ["Player", "Enemy", "Game Object", "Level Background"], default=st.session_state.customization['script_types'])
+    st.session_state.customization['image_count'] = {
+        'Character': st.sidebar.slider("Number of Characters", 1, 5, st.session_state.customization['image_count'].get('Character', 1)),
+        'Enemy': st.sidebar.slider("Number of Enemies", 1, 5, st.session_state.customization['image_count'].get('Enemy', 1)),
+        'Background': st.sidebar.slider("Number of Backgrounds", 1, 5, st.session_state.customization['image_count'].get('Background', 1)),
+        'Object': st.sidebar.slider("Number of Objects", 1, 5, st.session_state.customization['image_count'].get('Object', 2))
+    }
+    st.session_state.customization['script_count'] = {
+        'Player': st.sidebar.slider("Number of Player Scripts", 1, 5, st.session_state.customization['script_count'].get('Player', 1)),
+        'Enemy': st.sidebar.slider("Number of Enemy Scripts", 1, 5, st.session_state.customization['script_count'].get('Enemy', 1)),
+        'Game Object': st.sidebar.slider("Number of Game Object Scripts", 1, 5, st.session_state.customization['script_count'].get('Game Object', 3)),
+        'Level Background': st.sidebar.slider("Number of Level Background Scripts", 1, 5, st.session_state.customization['script_count'].get('Level Background', 1))
+    }
+    st.session_state.customization['use_replicate']['convert_to_3d'] = st.sidebar.checkbox("Convert Images to 3D", value=st.session_state.customization['use_replicate']['convert_to_3d'])
+    st.session_state.customization['use_replicate']['generate_music'] = st.sidebar.checkbox("Generate Music", value=st.session_state.customization['use_replicate']['generate_music'])
 
-    with st.spinner('Generating world concept...'):
-        game_plan['world_concept'] = generate_content(f"Create a detailed world concept for the 2D game: {game_plan['game_concept']}", "world building")
+    if st.sidebar.button("Generate Assets"):
+        with st.spinner("Generating assets..."):
+            images = generate_images(st.session_state.customization)
+            scripts = generate_unity_scripts(st.session_state.customization)
+            
+            # Prepare download options
+            st.sidebar.header("Download Options")
+            if st.sidebar.button("Download All as ZIP"):
+                zip_buffer = create_zip({'images': images, 'unity_scripts': scripts})
+                st.download_button("Download ZIP", zip_buffer, "game_assets.zip", "application/zip")
 
-    with st.spinner('Generating character concepts...'):
-        game_plan['character_concepts'] = generate_content(f"Create detailed character concepts for the player and enemies in the 2D game: {game_plan['game_concept']}", "character design")
+            # Display individual files
+            if st.session_state.customization['use_replicate']['generate_music']:
+                music_prompt = st.text_input("Music Generation Prompt", "Create a background music track for a 2D platformer game.")
+                if st.button("Generate Music"):
+                    music_url = generate_music(music_prompt)
+                    st.audio(music_url, format="audio/mp3")
 
-    with st.spinner('Generating plot...'):
-        game_plan['plot'] = generate_content(f"Create a plot for the 2D game based on the world and characters of the game: {game_plan['world_concept']} and {game_plan['character_concepts']}.", "plot development")
+            st.header("Generated Assets")
+            st.subheader("Images")
+            for key, url in images.items():
+                st.image(url, caption=key)
+                if st.button(f"Download {key}"):
+                    response = requests.get(url)
+                    st.download_button(f"Download {key}", response.content, f"{key}.png")
 
-    with st.spinner('Generating assets...'):
-        game_plan['images'] = generate_images(st.session_state.customization)
-        game_plan['scripts'] = generate_unity_scripts(st.session_state.customization)
-
-    return game_plan
-
-# Streamlit app layout
-st.title("Automate Your Game Dev")
-
-# API Key Inputs
-st.sidebar.header("API Keys")
-openai_key = st.sidebar.text_input("OpenAI API Key", value=st.session_state.api_keys['openai'])
-replicate_key = st.sidebar.text_input("Replicate API Key", value=st.session_state.api_keys['replicate'])
-if st.sidebar.button("Save API Keys"):
-    save_api_keys(openai_key, replicate_key)
-    st.session_state.api_keys['openai'] = openai_key
-    st.session_state.api_keys['replicate'] = replicate_key
-    st.sidebar.success("API Keys saved successfully!")
-
-# Customization Options
-st.sidebar.header("Customization")
-with st.sidebar.expander("Image Customization"):
-    for img_type in st.session_state.customization['image_types']:
-        st.session_state.customization['image_count'][img_type] = st.sidebar.number_input(f"Number of {img_type} Images", min_value=1, value=st.session_state.customization['image_count'][img_type])
-
-with st.sidebar.expander("Script Customization"):
-    for script_type in st.session_state.customization['script_types']:
-        st.session_state.customization['script_count'][script_type] = st.sidebar.number_input(f"Number of {script_type} Scripts", min_value=1, value=st.session_state.customization['script_count'][script_type])
-
-with st.sidebar.expander("Replicate Options"):
-    st.session_state.customization['use_replicate']['convert_to_3d'] = st.checkbox("Convert Images to 3D")
-    st.session_state.customization['use_replicate']['generate_music'] = st.checkbox("Generate Music")
-
-# Generate Game Plan
-user_prompt = st.text_area("Describe your game concept", "Enter a detailed description of your game here...")
-if st.button("Generate Game Plan"):
-    if not st.session_state.api_keys['openai'] or not st.session_state.api_keys['replicate']:
-        st.error("Please enter and save both OpenAI and Replicate API keys.")
-    else:
-        game_plan = generate_game_plan(user_prompt)
-
-        # Display game plan results
-        st.subheader("Game Concept")
-        st.write(game_plan['game_concept'])
-
-        st.subheader("World Concept")
-        st.write(game_plan['world_concept'])
-
-        st.subheader("Character Concepts")
-        st.write(game_plan['character_concepts'])
-
-        st.subheader("Plot")
-        st.write(game_plan['plot'])
-
-        st.subheader("Assets")
-        st.write("### Images")
-        for img_name, img_url in game_plan['images'].items():
-            st.write(f"{img_name}: [View Image]({img_url})")
-            if st.session_state.customization['use_replicate']['convert_to_3d']:
-                st.write(f"3D Model: [View 3D Model]({convert_image_to_3d(img_url)})")
-        
-        st.write("### Scripts")
-        for script_name, script_code in game_plan['scripts'].items():
-            st.write(f"{script_name}:\n```csharp\n{script_code}\n```")
-
-        # Save results
-        zip_buffer = BytesIO()
-        with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
-            for img_name, img_url in game_plan['images'].items():
-                if img_url.startswith('http'):
-                    img_response = requests.get(img_url)
-                    img = Image.open(BytesIO(img_response.content))
-                    img_file_name = f"{img_name}.png"
-                    with BytesIO() as img_buffer:
-                        img.save(img_buffer, format='PNG')
-                        zip_file.writestr(img_file_name, img_buffer.getvalue())
-            for script_name, script_code in game_plan['scripts'].items():
-                zip_file.writestr(script_name, script_code)
-
-        st.download_button("Download ZIP of Assets and Scripts", zip_buffer.getvalue(), file_name="game_plan.zip")
+            st.subheader("Unity Scripts")
+            for key, script in scripts.items():
+                st.text_area(key, script, height=300)
+                st.download_button(f"Download {key}", script, key)
+    
+if __name__ == "__main__":
+    main()
