@@ -206,7 +206,7 @@ def create_zip(content_dict):
     return zip_buffer
 
 def main():
-    st.title("Automated Video Game Creation")
+    st.title("Generate Game Assets")
 
     if not st.session_state.api_keys['openai'] or not st.session_state.api_keys['replicate']:
         openai_key, replicate_key = load_api_keys()
