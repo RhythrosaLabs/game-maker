@@ -5,7 +5,6 @@ import os
 import zipfile
 from io import BytesIO
 from PIL import Image
-from random_game_concept import generate_random_game_concept  # Import the function
 
 # Constants
 CHAT_API_URL = "https://api.openai.com/v1/chat/completions"
