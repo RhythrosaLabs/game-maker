@@ -1,6 +1,6 @@
 # game-maker
 
-Welcome to the Game Maker. This Streamlit app allows you to generate various assets for game development using the OpenAI API. You can create images, documents, scripts, and more, and download them all as a comprehensive game plan.
+Welcome to The Game Maker. This Streamlit app allows you to generate various assets for game development using the OpenAI API. You can create images, documents, scripts, and more, and download them all as a comprehensive game plan.
 
 ## Features
 
