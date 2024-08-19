@@ -15,6 +15,9 @@ API_KEY_FILE = "api_key.json"
 if 'api_key' not in st.session_state:
     st.session_state.api_key = None
 
+if 'replicate_key' not in st.session_state:
+    st.session_state.replicate_key = None
+
 if 'customization' not in st.session_state:
     st.session_state.customization = {
         'image_types': ['Character', 'Enemy', 'Background', 'Object'],
@@ -23,24 +26,28 @@ if 'customization' not in st.session_state:
         'script_count': {'Player': 1, 'Enemy': 1, 'Game Object': 3, 'Level Background': 1}
     }
 
-def load_api_key():
+def load_api_keys():
     if os.path.exists(API_KEY_FILE):
         with open(API_KEY_FILE, 'r') as file:
             data = json.load(file)
-            return data.get('api_key')
-    return None
+            return data.get('api_key'), data.get('replicate_key')
+    return None, None
 
-def save_api_key(api_key):
+def save_api_keys(api_key, replicate_key):
     with open(API_KEY_FILE, 'w') as file:
-        json.dump({"api_key": api_key}, file)
+        json.dump({"api_key": api_key, "replicate_key": replicate_key}, file)
 
-def get_headers():
-    return {
-        "Authorization": f"Bearer {st.session_state.api_key}",
-        "Content-Type": "application/json"
-    }
-
-
+def get_headers(api_type='openai'):
+    if api_type == 'openai':
+        return {
+            "Authorization": f"Bearer {st.session_state.api_key}",
+            "Content-Type": "application/json"
+        }
+    elif api_type == 'replicate':
+        return {
+            "Authorization": f"Token {st.session_state.replicate_key}",
+            "Content-Type": "application/json"
+        }
 
 def generate_content(prompt, role):
     data = {
@@ -205,78 +212,31 @@ def create_zip(content_dict):
 # Streamlit UI
 st.title("Quick Actions - Game Plan Generator")
 
+# Load API keys from file if not set
+if not st.session_state.api_key or not st.session_state.replicate_key:
+    st.session_state.api_key, st.session_state.replicate_key = load_api_keys()
+
 # API Key Input
 if not st.session_state.api_key:
-    st.session_state.api_key = load_api_key()
+    openai_key = st.text_input("Enter your OpenAI API key:", type="password")
+    replicate_key = st.text_input("Enter your Replicate API key:", type="password")
+    
+    if st.button("Set API Keys"):
+        st.session_state.api_key = openai_key
+        st.session_state.replicate_key = replicate_key
+        save_api_keys(st.session_state.api_key, st.session_state.replicate_key)
+        st.success("API keys set successfully!")
 
-if not st.session_state.api_key:
-    api_key = st.text_input("Enter your OpenAI API key:", type="password")
-    if st.button("Set API Key"):
-        st.session_state.api_key = api_key
-        save_api_key(api_key)
-        st.success("API key set successfully!")
-
-# Customization Inputs
-st.sidebar.header("Customization Options")
-
-# Image Customization
-image_types = st.sidebar.multiselect(
-    "Select image types to generate:",
-    options=['Character', 'Enemy', 'Background', 'Object'],
-    default=['Character', 'Enemy', 'Background', 'Object']
-)
-
-image_counts = {img_type: st.sidebar.slider(f"Number of {img_type} images:", min_value=1, max_value=10, value=st.session_state.customization['image_count'].get(img_type, 1)) for img_type in image_types}
-
-# Script Customization
-script_types = st.sidebar.multiselect(
-    "Select script types to generate:",
-    options=['Player', 'Enemy', 'Game Object', 'Level Background'],
-    default=['Player', 'Enemy', 'Game Object', 'Level Background']
-)
-
-script_counts = {script_type: st.sidebar.slider(f"Number of {script_type} scripts:", min_value=1, max_value=10, value=st.session_state.customization['script_count'].get(script_type, 1)) for script_type in script_types}
-
-# Save customization state
-st.session_state.customization['image_types'] = image_types
-st.session_state.customization['image_count'] = image_counts
-st.session_state.customization['script_types'] = script_types
-st.session_state.customization['script_count'] = script_counts
-
-# Main Content
+# Game Plan Generation
 if st.session_state.api_key:
     prompt = st.text_input("Enter topic/keywords for your game:")
     if st.button("Generate Game Plan"):
         if prompt:
-            st.session_state.game_plan = generate_game_plan(prompt)
+            game_plan = generate_game_plan(prompt)
+            st.write(game_plan['master_document'])
             
-            # Display generated content
-            game_plan = st.session_state.game_plan
-            for key, value in game_plan.items():
-                if key not in ["unity_scripts", "master_document", "images"]:
-                    st.subheader(key.replace('_', ' ').capitalize())
-                    st.write(value)
-                elif key == "images":
-                    for image_key, image_url in value.items():
-                        st.subheader(image_key.replace('_', ' ').capitalize())
-                        st.image(image_url)
-                elif key == "unity_scripts":
-                    st.subheader('Unity Scripts')
-                    for script_key, script_code in value.items():
-                        st.download_button(
-                            label=script_key,
-                            data=script_code,
-                            file_name=script_key,
-                            mime="text/plain"
-                        )
-
-            # Create download button for ZIP file
-            zip_file = create_zip(game_plan)
-            st.download_button(
-                label="Download Game Plan ZIP",
-                data=zip_file,
-                file_name="game_plan.zip",
-                mime="application/zip"
-            )
+            # Download option
+            zip_content = create_zip(game_plan)
+            st.download_button(label="Download Game Plan", data=zip_content, file_name="game_plan.zip", mime="application/zip")
         else:
             st.warning("Please enter a prompt.")
