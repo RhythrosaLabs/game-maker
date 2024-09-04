@@ -314,4 +314,23 @@ if st.button("Generate Game Plan"):
                 if img_url.startswith('http'):
                     img_response = requests.get(img_url)
                     img = Image.open(BytesIO(img_response.content))
-                    img
+                    img_file_name = f"{img_name}.png"
+                    with BytesIO() as img_buffer:
+                        img.save(img_buffer, format='PNG')
+                        zip_file.writestr(img_file_name, img_buffer.getvalue())
+            for script_name, script_code in game_plan['scripts'].items():
+                zip_file.writestr(script_name, script_code)
+
+        st.download_button("Download ZIP of Assets and Scripts", zip_buffer.getvalue(), file_name="game_plan.zip")
+
+# Optional: Add music generation if selected
+if st.session_state.customization['use_replicate']['generate_music']:
+    st.subheader("Generated Music")
+    music_prompt = f"Create background music for the game: {game_plan['game_concept']}"
+    music_url = generate_music(music_prompt)
+    if music_url:
+        st.audio(music_url, format='audio/mp3')
+    else:
+        st.write("Failed to generate music.")
+
+# End of the Streamlit app
