@@ -288,9 +288,9 @@ with about_tab:
     Key features:
     - Generate game concepts, world designs, and character ideas
     - Create game assets including images and Unity scripts
-    - Optional 3D model conversion and music generation
+    - Optional 3D model conversion and music generation (coming soon)
     
-    Powered by OpenAI's GPT and DALL-E, and Replicate's AI models.
+    Powered by OpenAI's GPT 4o-mini and DALL-E 3, plus various Replicate AI models.
     
     Created by Daniel Sheils (Rhythrosa Labs).
     """)
@@ -318,8 +318,8 @@ for script_type in st.session_state.customization['script_types']:
 
 # Replicate Options
 st.subheader("Replicate Options")
-st.session_state.customization['use_replicate']['convert_to_3d'] = st.checkbox("Convert Images to 3D")
-st.session_state.customization['use_replicate']['generate_music'] = st.checkbox("Generate Music")
+st.session_state.customization['use_replicate']['convert_to_3d'] = st.checkbox("Convert Images to 3D [feature not yet working]")
+st.session_state.customization['use_replicate']['generate_music'] = st.checkbox("Generate Music [feature not yet working]")
 
 # Generate Game Plan
 st.header("Generate Game Plan")
