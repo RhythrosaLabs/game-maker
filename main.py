@@ -292,7 +292,7 @@ with about_tab:
     
     Powered by OpenAI's GPT and DALL-E, and Replicate's AI models.
     
-    Created by [Your Name/Company]. For support, contact: support@example.com
+    Created by Daniel Sheils (Rhythrosa Labs).
     """)
 
 # Main content area
