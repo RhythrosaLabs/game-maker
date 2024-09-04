@@ -49,7 +49,7 @@ def get_openai_headers():
 # Generate content using OpenAI API
 def generate_content(prompt, role):
     data = {
-        "model": "gpt-4o-mini",
+        "model": "gpt-4",
         "messages": [
             {"role": "system", "content": f"You are a helpful assistant specializing in {role}."},
             {"role": "user", "content": prompt}
@@ -139,13 +139,14 @@ def generate_music(prompt):
         return f"Error: Unable to generate music: {str(e)}"
         
 # Generate multiple images based on customization settings
-def generate_images(customization):
+def generate_images(customization, game_concept):
     images = {}
     
+    # Base prompts
     image_prompts = {
         'Character': "Create a highly detailed, front-facing character concept art for a 2D game. The character should be in a neutral pose, with clearly defined features and high contrast. The design should be suitable for 3d rigging and for animation, with clear lines and distinct colors.",
-        'Enemy': "Design a menacing, front-facing enemy character concept art for a 2D game. The enemy should have a threatening appearance with distinctive features, and be suitable for 3d rigging and animation. The design should be highly detailed with a clear silhouette, in a neutral pose",
-        'Background': "Create a wide, highly detailed background image for a level of the gamey. The scene should include a clear distinction between foreground, midground, and background elements. The style should be consistent with the theme, with room for character movement in the foreground.",
+        'Enemy': "Design a menacing, front-facing enemy character concept art for a 2D game. The enemy should have a threatening appearance with distinctive features, and be suitable for 3d rigging and animation. The design should be highly detailed with a clear silhouette, in a neutral pose.",
+        'Background': "Create a wide, highly detailed background image for a level of the game. The scene should include a clear distinction between foreground, midground, and background elements. The style should be consistent with the theme, with room for character movement in the foreground.",
         'Object': "Create a detailed object image for a 2D game. The object should be a key item with a transparent background, easily recognizable, and fitting the theme. The design should be clear, with minimal unnecessary details, to ensure it integrates well into the game environment."
     }
     
@@ -158,7 +159,8 @@ def generate_images(customization):
 
     for img_type in st.session_state.customization['image_types']:
         for i in range(st.session_state.customization['image_count'].get(img_type, 1)):
-            prompt = f"{image_prompts[img_type]} - Variation {i + 1}"
+            # Incorporate game concept into the prompt
+            prompt = f"{image_prompts[img_type]} The design should fit the following game concept: {game_concept}. Variation {i + 1}"
             size = sizes[img_type]
             image_url = generate_image(prompt, size)
             if st.session_state.customization['use_replicate']['convert_to_3d'] and img_type != 'Background':
@@ -168,12 +170,12 @@ def generate_images(customization):
     return images
 
 # Generate Unity scripts based on customization settings
-def generate_unity_scripts(customization):
+def generate_unity_scripts(customization, game_concept):
     script_descriptions = {
-        'Player': "Unity script for the player character with WASD controls and space bar to jump or shoot.",
-        'Enemy': "Unity script for an enemy character with basic AI behavior.",
-        'Game Object': "Unity script for a game object with basic functionality.",
-        'Level Background': "Unity script for the level background."
+        'Player': f"Unity script for the player character with WASD controls and space bar to jump or shoot. The character should fit the following game concept: {game_concept}",
+        'Enemy': f"Unity script for an enemy character with basic AI behavior. The enemy should fit the following game concept: {game_concept}",
+        'Game Object': f"Unity script for a game object with basic functionality. The object should fit the following game concept: {game_concept}",
+        'Level Background': f"Unity script for the level background. The background should fit the following game concept: {game_concept}"
     }
     
     scripts = {}
@@ -216,37 +218,82 @@ def create_zip(content_dict):
 # Generate a complete game plan
 def generate_game_plan(user_prompt):
     game_plan = {}
+    
+    # Status updates
+    status = st.empty()
+    progress_bar = st.progress(0)
+    
+    def update_status(message, progress):
+        status.text(message)
+        progress_bar.progress(progress)
 
-    with st.spinner('Generating game concept...'):
-        game_plan['game_concept'] = generate_content(f"Invent a new 2D game concept with a detailed theme, setting, and unique features based on the following prompt: {user_prompt}. Ensure the game has WASD controls.", "game design")
+    # Generate game concept
+    update_status("Generating game concept...", 0.1)
+    game_plan['game_concept'] = generate_content(f"Invent a new 2D game concept with a detailed theme, setting, and unique features based on the following prompt: {user_prompt}. Ensure the game has WASD controls.", "game design")
+    
+    # Generate world concept
+    update_status("Creating world concept...", 0.2)
+    game_plan['world_concept'] = generate_content(f"Create a detailed world concept for the 2D game: {game_plan['game_concept']}", "world building")
+    
+    # Generate character concepts
+    update_status("Designing characters...", 0.3)
+    game_plan['character_concepts'] = generate_content(f"Create detailed character concepts for the player and enemies in the 2D game: {game_plan['game_concept']}", "character design")
+    
+    # Generate plot
+    update_status("Crafting the plot...", 0.4)
+    game_plan['plot'] = generate_content(f"Create a plot for the 2D game based on the world and characters of the game: {game_plan['world_concept']} and {game_plan['character_concepts']}.", "plot development")
+    
+    # Generate images
+    update_status("Generating game images...", 0.5)
+    game_plan['images'] = generate_images(st.session_state.customization, game_plan['game_concept'])
+    
+    # Generate scripts
+    update_status("Writing Unity scripts...", 0.7)
+    game_plan['scripts'] = generate_unity_scripts(st.session_state.customization, game_plan['game_concept'])
+    
+    # Optional: Generate music
+    if st.session_state.customization['use_replicate']['generate_music']:
+        update_status("Composing background music...", 0.9)
+        music_prompt = f"Create background music for the game: {game_plan['game_concept']}"
+        game_plan['music'] = generate_music(music_prompt)
 
-    with st.spinner('Generating world concept...'):
-        game_plan['world_concept'] = generate_content(f"Create a detailed world concept for the 2D game: {game_plan['game_concept']}", "world building")
-
-    with st.spinner('Generating character concepts...'):
-        game_plan['character_concepts'] = generate_content(f"Create detailed character concepts for the player and enemies in the 2D game: {game_plan['game_concept']}", "character design")
-
-    with st.spinner('Generating plot...'):
-        game_plan['plot'] = generate_content(f"Create a plot for the 2D game based on the world and characters of the game: {game_plan['world_concept']} and {game_plan['character_concepts']}.", "plot development")
-
-    with st.spinner('Generating assets...'):
-        game_plan['images'] = generate_images(st.session_state.customization)
-        game_plan['scripts'] = generate_unity_scripts(st.session_state.customization)
+    update_status("Game plan generation complete!", 1.0)
 
     return game_plan
 
 # Streamlit app layout
 st.title("Automate Your Game Dev")
 
+# Sidebar
+st.sidebar.title("Settings")
+
 # API Key Inputs (in the sidebar)
-st.sidebar.header("API Keys")
-openai_key = st.sidebar.text_input("OpenAI API Key", value=st.session_state.api_keys['openai'])
-replicate_key = st.sidebar.text_input("Replicate API Key", value=st.session_state.api_keys['replicate'])
-if st.sidebar.button("Save API Keys"):
-    save_api_keys(openai_key, replicate_key)
-    st.session_state.api_keys['openai'] = openai_key
-    st.session_state.api_keys['replicate'] = replicate_key
-    st.sidebar.success("API Keys saved successfully!")
+api_tab, about_tab = st.sidebar.tabs(["API Keys", "About"])
+
+with api_tab:
+    openai_key = st.text_input("OpenAI API Key", value=st.session_state.api_keys['openai'])
+    replicate_key = st.text_input("Replicate API Key", value=st.session_state.api_keys['replicate'])
+    if st.button("Save API Keys"):
+        save_api_keys(openai_key, replicate_key)
+        st.session_state.api_keys['openai'] = openai_key
+        st.session_state.api_keys['replicate'] = replicate_key
+        st.success("API Keys saved successfully!")
+
+with about_tab:
+    st.write("""
+    # About Automate Your Game Dev
+
+    This app helps game developers automate various aspects of their game development process using AI. 
+    
+    Key features:
+    - Generate game concepts, world designs, and character ideas
+    - Create game assets including images and Unity scripts
+    - Optional 3D model conversion and music generation
+    
+    Powered by OpenAI's GPT and DALL-E, and Replicate's AI models.
+    
+    Created by [Your Name/Company]. For support, contact: support@example.com
+    """)
 
 # Main content area
 st.header("Customization")
@@ -300,7 +347,7 @@ if st.button("Generate Game Plan"):
         st.write("### Images")
         for img_name, img_url in game_plan['images'].items():
             st.write(f"{img_name}: [View Image]({img_url})")
-            if st.session_state.customization['use_replicate']['convert_to_3d']:
+            if st.session_state.customization['use_replicate']['convert_to_3d'] and 'background' not in img_name.lower():
                 st.write(f"3D Model: [View 3D Model]({convert_image_to_3d(img_url)})")
         
         st.write("### Scripts")
@@ -323,14 +370,12 @@ if st.button("Generate Game Plan"):
 
         st.download_button("Download ZIP of Assets and Scripts", zip_buffer.getvalue(), file_name="game_plan.zip")
 
-# Optional: Add music generation if selected
-if st.session_state.customization['use_replicate']['generate_music']:
-    st.subheader("Generated Music")
-    music_prompt = f"Create background music for the game: {game_plan['game_concept']}"
-    music_url = generate_music(music_prompt)
-    if music_url:
-        st.audio(music_url, format='audio/mp3')
-    else:
-        st.write("Failed to generate music.")
+        # Display generated music if applicable
+        if st.session_state.customization['use_replicate']['generate_music']:
+            st.subheader("Generated Music")
+            if game_plan.get('music'):
+                st.audio(game_plan['music'], format='audio/mp3')
+            else:
+                st.write("Failed to generate music.")
 
 # End of the Streamlit app
