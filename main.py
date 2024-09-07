@@ -292,7 +292,7 @@ with about_tab:
     
     Powered by OpenAI's GPT 4o-mini and DALL-E 3, plus various Replicate AI models.
     
-    Created by Daniel Sheils (Rhythrosa Labs).
+    Created by [Daniel Sheils](https://www.linkedin.com/in/danielsheils/) (Rhythrosa Labs).
     """)
 
 # Main content area
