@@ -49,7 +49,7 @@ def get_openai_headers():
 # Generate content using OpenAI API
 def generate_content(prompt, role):
     data = {
-        "model": "gpt-4",
+        "model": "gpt-4o-mini",
         "messages": [
             {"role": "system", "content": f"You are a helpful assistant specializing in {role}."},
             {"role": "user", "content": prompt}
@@ -285,15 +285,14 @@ with about_tab:
 
     This app helps game developers automate various aspects of their game development process using AI. 
     
-    Key features:
+    ## Key features:
     - Generate game concepts, world designs, and character ideas
     - Create game assets including images and Unity scripts
     - Optional 3D model conversion and music generation (coming soon)
     
     Powered by OpenAI's GPT 4o-mini and DALL-E 3, plus various Replicate AI models.
     
-    Created by Daniel Sheils (Rhythrosa Labs).
-    """)
+    Created by [Daniel Sheils](https://www.linkedin.com/in/danielsheils/) (Rhythrosa Labs).
 
 # Main content area
 st.header("Customization")
