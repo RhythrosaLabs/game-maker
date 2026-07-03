@@ -15,3 +15,8 @@ explore the web app:
 
 https://game-maker.streamlit.app
 
+
+
+## Support
+
+If you find this useful, consider supporting via [PayPal](https://paypal.me/noodlebake)
